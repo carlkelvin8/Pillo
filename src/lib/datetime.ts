@@ -28,6 +28,14 @@ export function addDays(date: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** First clinic-local calendar date of the month after `date`. */
+export function firstDayOfNextMonth(date: string): string {
+  const d = utcDate(date);
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
 /** The next Monday-to-Friday day after `date` (payouts do not arrive on weekends). */
 export function nextBusinessDay(date: string): string {
   let d = addDays(date, 1);

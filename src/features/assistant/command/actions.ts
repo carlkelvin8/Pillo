@@ -27,8 +27,8 @@ export async function askOwnerAction(_p: ActionState, formData: FormData): Promi
   const call = createModelCall();
   if (!call)
     return {
-      message:
-        "Dr. Pill is paused for live clinic data. Use the local synthetic Gemini demo instead.",
+      message: "Clinic questions are not available right now. Please check again later.",
+      values: echo(formData, ["question"]),
     };
   if (!rateLimit(`ask:${ws.user.id}`, 20, 3600_000))
     return {

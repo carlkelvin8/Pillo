@@ -5,82 +5,64 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
 import { requireCapability } from "@/features/auth/workspace";
 import { BalanceHero } from "@/features/payments/components/balance-hero";
-import { WithdrawDialog } from "@/features/payments/components/withdraw-dialog";
 import {
   collectionsData,
   getBalance,
   listTransactions,
   methodLabel,
-  type Transaction,
+  TRANSACTION_PAGE_SIZE,
+  type TransactionFilter,
 } from "@/features/payments/queries";
-import { addDays, dateOf, formatDateShort, nextBusinessDay, todayIn } from "@/lib/datetime";
+import { addDays, dateOf, formatDateShort, todayIn } from "@/lib/datetime";
 import { formatPHP } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Payments" };
 
-type Props = { searchParams: Promise<{ filter?: string }> };
+type Props = { searchParams: Promise<{ filter?: string; page?: string }> };
 const FILTERS = [
   { key: "all", label: "All" },
-  { key: "incoming", label: "Incoming" },
-  { key: "outgoing", label: "Outgoing" },
   { key: "pending", label: "Pending" },
 ] as const;
-type Filter = (typeof FILTERS)[number]["key"];
+type Filter = TransactionFilter;
 
 const TONE = {
   paid: "success",
-  completed: "success",
   pending: "pending",
-  processing: "pending",
 } as const;
 const LABEL = {
   paid: "Paid",
-  completed: "Completed",
   pending: "Pending",
-  processing: "Processing",
 } as const;
-
-const matches = (t: Transaction, f: Filter) =>
-  f === "all" ||
-  (f === "incoming" && t.kind === "incoming") ||
-  (f === "outgoing" && t.kind === "outgoing") ||
-  (f === "pending" && (t.status === "pending" || t.status === "processing"));
 
 export default async function PaymentsPage({ searchParams }: Props) {
   const { membership } = await requireCapability("payments.manage");
   const params = await searchParams;
   const filter: Filter = FILTERS.find((f) => f.key === params.filter)?.key ?? "all";
+  const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
   const clinicId = membership.clinic.id;
   const tz = membership.clinic.timezone;
   const today = todayIn(tz);
 
   const sinceIso = `${addDays(today, -30)}T00:00:00.000Z`;
-  const [balance, { items, payouts }, mix] = await Promise.all([
+  const [balance, { items, total }, mix] = await Promise.all([
     getBalance(clinicId),
-    listTransactions(clinicId),
+    listTransactions(clinicId, { page, filter }),
     collectionsData(clinicId, sinceIso, tz),
   ]);
-  const shown = items.filter((t) => matches(t, filter));
   const totalMix = [...mix.byMethod.values()].reduce((a, b) => a + b, 0);
-  const nextPayout = payouts
-    .filter((p) => p.status === "processing")
-    .sort((a, b) => a.arrives_on.localeCompare(b.arrives_on))[0];
-  const arrives = formatDateShort(nextBusinessDay(today));
+  const pages = Math.max(1, Math.ceil(total / TRANSACTION_PAGE_SIZE));
+  const href = (f: Filter, p: number) => {
+    const query = new URLSearchParams();
+    if (f !== "all") query.set("filter", f);
+    if (p > 1) query.set("page", String(p));
+    return query.size ? `/payments?${query}` : "/payments";
+  };
 
   return (
     <>
       <PageHeader eyebrow="Money" title="Payments" />
-      <p
-        role="note"
-        className="rounded-card bg-amber-chip text-amber-chip-ink p-4 text-sm font-medium"
-      >
-        Demo payouts: withdrawals are recorded here but no real money moves yet. Online payments
-        from patients are real once PayMongo is connected.
-      </p>
-      <BalanceHero centavos={balance}>
-        <WithdrawDialog available={balance} arrives={arrives} />
-      </BalanceHero>
+      <BalanceHero centavos={balance} />
 
       <div className="grid items-stretch gap-6 lg:grid-cols-[1.6fr_1fr]">
         <Card className="flex flex-col gap-4 p-2 sm:p-6">
@@ -90,7 +72,7 @@ export default async function PaymentsPage({ searchParams }: Props) {
               {FILTERS.map((f) => (
                 <Link
                   key={f.key}
-                  href={f.key === "all" ? "/payments" : `/payments?filter=${f.key}`}
+                  href={href(f.key, 1)}
                   aria-current={filter === f.key ? "page" : undefined}
                   className={cn(
                     "inline-flex min-h-11 items-center rounded-full px-4 text-sm font-medium",
@@ -102,13 +84,13 @@ export default async function PaymentsPage({ searchParams }: Props) {
               ))}
             </nav>
           </div>
-          {shown.length === 0 ? (
+          {items.length === 0 ? (
             <p className="text-muted px-4 py-10 text-center">No transactions yet.</p>
           ) : (
             <ul className="divide-line flex flex-col divide-y">
-              {shown.map((t) => (
+              {items.map((t) => (
                 <li
-                  key={`${t.kind}-${t.id}`}
+                  key={t.id}
                   className="flex flex-wrap items-center gap-x-4 gap-y-1 px-2 py-3 sm:px-0"
                 >
                   <div className="min-w-0 flex-1">
@@ -141,63 +123,80 @@ export default async function PaymentsPage({ searchParams }: Props) {
               ))}
             </ul>
           )}
+          <nav
+            aria-label="Transaction pages"
+            className="border-line flex flex-wrap items-center justify-between gap-3 border-t pt-4"
+          >
+            <span className="text-muted text-sm">
+              Showing {total === 0 ? 0 : (page - 1) * TRANSACTION_PAGE_SIZE + 1}–
+              {Math.min(page * TRANSACTION_PAGE_SIZE, total)} of {total} · {TRANSACTION_PAGE_SIZE}{" "}
+              per page
+            </span>
+            <div className="flex gap-2">
+              <Link
+                aria-disabled={page <= 1}
+                tabIndex={page <= 1 ? -1 : undefined}
+                className="border-line inline-flex min-h-11 items-center rounded-full border px-4 text-sm aria-disabled:pointer-events-none aria-disabled:opacity-40"
+                href={href(filter, Math.max(1, page - 1))}
+              >
+                Previous
+              </Link>
+              <Link
+                aria-disabled={page >= pages}
+                tabIndex={page >= pages ? -1 : undefined}
+                className="border-line inline-flex min-h-11 items-center rounded-full border px-4 text-sm aria-disabled:pointer-events-none aria-disabled:opacity-40"
+                href={href(filter, Math.min(pages, page + 1))}
+              >
+                Next
+              </Link>
+            </div>
+          </nav>
         </Card>
 
         <div className="flex flex-col gap-6">
           <Card className="flex flex-col gap-4">
-            <CardTitle>How patients pay</CardTitle>
-            <p className="text-muted -mt-2 text-sm">Last 30 days</p>
+            <div>
+              <CardTitle>Collections</CardTitle>
+              <p className="text-muted mt-1 text-sm">Last 30 days</p>
+            </div>
+            <div>
+              <p className="tabular text-2xl font-semibold tracking-tight">
+                {formatPHP(totalMix)}
+              </p>
+              <p className="text-muted text-sm">
+                {mix.rows.length} successful {mix.rows.length === 1 ? "payment" : "payments"}
+              </p>
+            </div>
             {totalMix === 0 ? (
               <p className="text-muted text-sm">No payments yet.</p>
             ) : (
-              <ul className="flex flex-col gap-3">
-                {[...mix.byMethod.entries()]
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([method, amount]) => {
-                    const pct = Math.round((amount / totalMix) * 100);
-                    return (
-                      <li key={method} className="flex flex-col gap-1">
-                        <div className="flex justify-between text-sm">
-                          <span>{methodLabel(method as never)}</span>
-                          <span className="tabular font-medium">{pct}%</span>
-                        </div>
-                        <div
-                          className="bg-subtle h-2 overflow-hidden rounded-full"
-                          aria-hidden="true"
-                        >
+              <>
+                <h3 className="font-semibold">How patients pay</h3>
+                <ul className="flex flex-col gap-3">
+                  {[...mix.byMethod.entries()]
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([method, amount]) => {
+                      const pct = Math.round((amount / totalMix) * 100);
+                      return (
+                        <li key={method} className="flex flex-col gap-1">
+                          <div className="flex justify-between text-sm">
+                            <span>{methodLabel(method as never)}</span>
+                            <span className="tabular font-medium">{pct}%</span>
+                          </div>
                           <div
-                            className="bg-mint-strong h-full rounded-full"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </li>
-                    );
-                  })}
-              </ul>
-            )}
-          </Card>
-
-          <Card className="flex flex-col gap-3">
-            <CardTitle>Payout schedule</CardTitle>
-            {nextPayout ? (
-              <dl className="flex flex-col gap-2 text-sm">
-                <div className="flex justify-between">
-                  <dt className="text-muted">Next payout</dt>
-                  <dd className="tabular font-medium">{formatDateShort(nextPayout.arrives_on)}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-muted">Amount</dt>
-                  <dd className="tabular font-medium">{formatPHP(nextPayout.amount_centavos)}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-muted">To</dt>
-                  <dd className="font-medium">{nextPayout.destination}</dd>
-                </div>
-              </dl>
-            ) : (
-              <p className="text-muted text-sm">
-                No payouts scheduled. Use Withdraw to record one (demo).
-              </p>
+                            className="bg-subtle h-2 overflow-hidden rounded-full"
+                            aria-hidden="true"
+                          >
+                            <div
+                              className="bg-mint-strong h-full rounded-full"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </li>
+                      );
+                    })}
+                </ul>
+              </>
             )}
           </Card>
         </div>

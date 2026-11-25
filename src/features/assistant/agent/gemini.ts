@@ -1,36 +1,50 @@
-import { FunctionCallingConfigMode, GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import type { ModelCall, ModelMessage, ModelRequest, ModelResponse } from "./model";
 
-type ContentPart = Record<string, unknown>;
+type InteractionInputStep = Record<string, unknown>;
 
-function toContents(messages: ModelMessage[]) {
-  return messages.map((message) => {
+export const GEMINI_REQUEST_OPTIONS = {
+  timeout_ms: 10_000,
+  retries: { strategy: "none" },
+} as const;
+
+function asArguments(input: unknown): Record<string, unknown> {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) return {};
+  return input as Record<string, unknown>;
+}
+
+function toInteractionInput(messages: ModelMessage[]): InteractionInputStep[] {
+  return messages.flatMap((message) => {
     if (message.role === "tool") {
-      return {
-        role: "user",
-        parts: message.toolResults.map((result) => ({
-          functionResponse: {
-            id: result.callId,
-            name: result.name,
-            response: { content: result.content, isError: result.isError },
-          },
-        })),
-      };
+      return message.toolResults.map((result) => ({
+        type: "function_result",
+        call_id: result.callId,
+        name: result.name,
+        result: result.content,
+        is_error: result.isError,
+      }));
     }
+
     if (message.role === "assistant" && "toolCalls" in message) {
-      const parts: ContentPart[] = [];
-      if (message.content) parts.push({ text: message.content });
-      parts.push(
+      const steps: InteractionInputStep[] = [];
+      if (message.content) {
+        steps.push({ type: "model_output", content: [{ type: "text", text: message.content }] });
+      }
+      steps.push(
         ...message.toolCalls.map((call) => ({
-          functionCall: { id: call.id, name: call.name, args: call.input },
+          type: "function_call",
+          id: call.id,
+          name: call.name,
+          arguments: asArguments(call.input),
         })),
       );
-      return { role: "model", parts };
+      return steps;
     }
-    return {
-      role: message.role === "assistant" ? "model" : "user",
-      parts: [{ text: message.content }],
-    };
+
+    return [{
+      type: message.role === "assistant" ? "model_output" : "user_input",
+      content: [{ type: "text", text: message.content }],
+    }];
   });
 }
 
@@ -40,49 +54,42 @@ export function createGeminiModelCall(options: {
 }): ModelCall {
   const client = options.client ?? new GoogleGenAI({ apiKey: options.apiKey });
   return async (request: ModelRequest): Promise<ModelResponse> => {
-    const result = await client.models.generateContent({
-      model: request.model,
-      contents: toContents(request.messages),
-      config: {
-        systemInstruction: request.system,
-        tools: request.tools.length
-          ? [
-              {
-                functionDeclarations: request.tools.map(({ name, description, parameters }) => ({
-                  name,
-                  description,
-                  parameters,
-                })),
-              },
-            ]
-          : undefined,
-        toolConfig: { functionCallingConfig: { mode: FunctionCallingConfigMode.AUTO } },
-        automaticFunctionCalling: { disable: true },
+    const interaction = await client.interactions.create(
+      {
+        model: request.model,
+        system_instruction: request.system,
+        tools: request.tools.map(({ name, description, parameters }) => ({
+          type: "function",
+          name,
+          description,
+          parameters,
+        })),
+        input: toInteractionInput(request.messages) as never,
+        store: false,
       },
-    });
+      GEMINI_REQUEST_OPTIONS,
+    );
 
-    const candidate = result.candidates?.[0];
-    const parts = candidate?.content?.parts ?? [];
-    const text = parts
-      .filter((part) => typeof part.text === "string")
-      .map((part) => part.text)
+    const steps = interaction.steps ?? [];
+    const text = steps
+      .filter((step) => step.type === "model_output")
+      .flatMap((step) => step.content ?? [])
+      .flatMap((part) => part.type === "text" ? [part.text] : [])
       .join("\n")
       .trim();
-    const toolCalls = parts.flatMap((part, index) => {
-      if (!part.functionCall?.name) return [];
-      return [
-        {
-          id: part.functionCall.id ?? `missing-${index}`,
-          name: part.functionCall.name,
-          input: part.functionCall.args ?? null,
-        },
-      ];
+    const toolCalls = steps.flatMap((step, index) => {
+      if (step.type !== "function_call") return [];
+      return [{
+        id: step.id || `missing-${index}`,
+        name: step.name ?? "",
+        input: asArguments(step.arguments),
+      }];
     });
-    const stopReason = toolCalls.length
-      ? "tool_use"
-      : candidate?.finishReason === "SAFETY" || candidate?.finishReason === "BLOCKLIST"
-        ? "refusal"
-        : "end";
-    return { text, toolCalls, stopReason };
+
+    return {
+      text,
+      toolCalls,
+      stopReason: toolCalls.length ? "tool_use" : "end",
+    };
   };
 }

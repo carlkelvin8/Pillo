@@ -5,6 +5,7 @@ import {
   dayBoundsUtc,
   formatTime,
   formatWeekRange,
+  firstDayOfNextMonth,
   isDateString,
   lastMonths,
   nextBusinessDay,
@@ -39,6 +40,13 @@ describe("lastMonths", () => {
   it("lists months oldest first, across a year boundary", () => {
     expect(lastMonths("2027-02-10", 4)).toEqual(["2026-11", "2026-12", "2027-01", "2027-02"]);
     expect(lastMonths("2026-11-24", 1)).toEqual(["2026-11"]);
+  });
+});
+
+describe("firstDayOfNextMonth", () => {
+  it("returns the first local calendar date of the following month", () => {
+    expect(firstDayOfNextMonth("2026-11-25")).toBe("2026-12-01");
+    expect(firstDayOfNextMonth("2026-12-31")).toBe("2027-01-01");
   });
 });
 

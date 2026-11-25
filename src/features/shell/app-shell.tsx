@@ -8,6 +8,7 @@ import { navForRole } from "./nav-config";
 import { MobileNav } from "./mobile-nav";
 import { SidebarNav } from "./sidebar-nav";
 import { UserCard } from "./user-card";
+import { DrPillCompanion } from "./dr-pill-companion";
 
 type AppShellProps = {
   user: { name: string | null; email: string };
@@ -16,7 +17,7 @@ type AppShellProps = {
   children: ReactNode;
 };
 
-/** 320px sidebar + top bar (search, notifications) + page content. */
+/** 256px sidebar + top bar (search, notifications) + page content. */
 export function AppShell({ user, role, clinicName, children }: AppShellProps) {
   const groups = navForRole(role);
   const sidebarHeader = (
@@ -45,7 +46,7 @@ export function AppShell({ user, role, clinicName, children }: AppShellProps) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sm:px-page flex min-h-22 w-full items-center justify-center px-6 py-5">
-          <div className="flex w-full max-w-[96rem] items-center justify-between gap-3">
+          <div className="flex w-full max-w-[112rem] items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <MobileNav>
                 <div className="flex flex-1 flex-col gap-7">
@@ -75,10 +76,11 @@ export function AppShell({ user, role, clinicName, children }: AppShellProps) {
             </button>
           </div>
         </header>
-        <main className="sm:px-page mx-auto flex w-full max-w-[96rem] min-w-0 flex-col gap-8 px-6 pt-2 pb-16">
+        <main className="sm:px-page mx-auto flex w-full max-w-[112rem] min-w-0 flex-col gap-8 px-6 pt-2 pb-16">
           {children}
         </main>
       </div>
+      <DrPillCompanion role={role} />
     </div>
   );
 }

@@ -16,7 +16,7 @@ export function SidebarNav({ groups }: { groups: NavGroup[] }) {
                 <NavLink
                   href={href}
                   matchPrefix={matchPrefix}
-                  className="rounded-control text-ink-2 hover:bg-subtle flex min-h-[55px] items-center gap-4 px-4 text-sm font-medium"
+                  className="rounded-control text-ink-2 hover:bg-subtle flex min-h-12 items-center gap-3.5 px-3.5 text-sm font-medium transition-colors duration-150"
                   activeClassName="bg-ink text-surface hover:bg-ink"
                 >
                   <Icon className="size-5 shrink-0" aria-hidden="true" />

@@ -1,11 +1,12 @@
 "use client";
 
-import { SendHorizontal } from "lucide-react";
+import { SendHorizontal, Square, Volume2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DrPillAvatar } from "@/components/brand/dr-pill-avatar";
 import { Button } from "@/components/ui/button";
 import { ASSISTANT_NAME } from "@/config/brand";
 import { cn } from "@/lib/utils";
+import { findLocalSpeechVoice } from "./local-speech";
 
 type Msg = { id: string; role: "patient" | "assistant" | "staff"; content: string };
 type Stored = { id: string; token: string };
@@ -29,7 +30,10 @@ export function ChatWindow({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [humanActive, setHumanActive] = useState(false);
+  const [voiceMessageId, setVoiceMessageId] = useState<string | null>(null);
+  const [voiceNotice, setVoiceNotice] = useState<{ id: string; message: string } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const speechRunId = useRef(0);
 
   useEffect(() => {
     try {
@@ -81,6 +85,52 @@ export function ChatWindow({
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
     });
   }, [messages, sending]);
+
+  useEffect(
+    () => () => {
+      speechRunId.current += 1;
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    },
+    [],
+  );
+
+  function toggleReadAloud(id: string, text: string) {
+    if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
+      setVoiceNotice({ id, message: "Read aloud is not available in this browser. The message is still available as text." });
+      return;
+    }
+
+    if (voiceMessageId === id) {
+      speechRunId.current += 1;
+      window.speechSynthesis.cancel();
+      setVoiceMessageId(null);
+      return;
+    }
+
+    const voice = findLocalSpeechVoice(window.speechSynthesis.getVoices());
+    if (!voice) {
+      setVoiceNotice({ id, message: "No local voice is available on this device. The message is still available as text." });
+      return;
+    }
+
+    const runId = ++speechRunId.current;
+    window.speechSynthesis.cancel();
+    setVoiceNotice(null);
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = voice;
+    utterance.onend = () => {
+      if (speechRunId.current === runId) setVoiceMessageId(null);
+    };
+    utterance.onerror = (event) => {
+      if (speechRunId.current !== runId) return;
+      setVoiceMessageId(null);
+      if (event.error !== "canceled" && event.error !== "interrupted") {
+        setVoiceNotice({ id, message: "Read aloud could not play. The message is still available as text." });
+      }
+    };
+    setVoiceMessageId(id);
+    window.speechSynthesis.speak(utterance);
+  }
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
@@ -158,9 +208,24 @@ export function ChatWindow({
         aria-label="Conversation"
         className="flex flex-1 flex-col gap-3 overflow-y-auto px-5 py-4"
       >
-        <Bubble role="assistant">{greeting}</Bubble>
+        <Bubble
+          role="assistant"
+          messageId="greeting"
+          playing={voiceMessageId === "greeting"}
+          notice={voiceNotice?.id === "greeting" ? voiceNotice.message : undefined}
+          onReadAloud={toggleReadAloud}
+        >
+          {greeting}
+        </Bubble>
         {messages.map((m) => (
-          <Bubble key={m.id} role={m.role}>
+          <Bubble
+            key={m.id}
+            role={m.role}
+            messageId={m.id}
+            playing={voiceMessageId === m.id}
+            notice={voiceNotice?.id === m.id ? voiceNotice.message : undefined}
+            onReadAloud={toggleReadAloud}
+          >
             {m.content}
           </Bubble>
         ))}
@@ -214,7 +279,21 @@ export function ChatWindow({
   );
 }
 
-function Bubble({ role, children }: { role: Msg["role"]; children: React.ReactNode }) {
+function Bubble({
+  role,
+  children,
+  messageId,
+  playing,
+  notice,
+  onReadAloud,
+}: {
+  role: Msg["role"];
+  children: React.ReactNode;
+  messageId: string;
+  playing: boolean;
+  notice?: string;
+  onReadAloud: (id: string, text: string) => void;
+}) {
   const patient = role === "patient";
   return (
     <div className={cn("flex flex-col gap-1", patient ? "items-end" : "items-start")}>
@@ -229,6 +308,22 @@ function Bubble({ role, children }: { role: Msg["role"]; children: React.ReactNo
       >
         {children}
       </p>
+      {role === "assistant" ? (
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="min-h-11"
+            aria-label={playing ? "Stop reading message" : "Read message aloud"}
+            aria-pressed={playing}
+            onClick={() => onReadAloud(messageId, String(children))}
+          >
+            {playing ? <Square aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
+          </Button>
+          {notice ? <p role="status" className="text-muted max-w-64 text-xs">{notice}</p> : null}
+        </div>
+      ) : null}
     </div>
   );
 }

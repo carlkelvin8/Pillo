@@ -218,29 +218,55 @@ describe("create_invoice (atomic)", () => {
 
 describe("update_draft_invoice (atomic)", () => {
   it("replaces draft items and patient in one transaction, deriving totals", async () => {
-    const id = await makeInvoice(u.recepA, { items: [{ description: "Old item", qty: 1, price: 500 }] });
-    const [newPatient] = await admin<{ id: string }[]>`insert into public.patients (clinic_id, full_name) values (${clinicA}, 'Second Billing Patient') returning id`;
-    await asUserCommitted(u.recepA, (tx) => tx`select public.update_draft_invoice(${clinicA}, ${id}, ${newPatient!.id}, current_date + 14, ${tx.json([{ description: "Updated", quantity: 2, unit_price_centavos: 700 }] as never)})`);
+    const id = await makeInvoice(u.recepA, {
+      items: [{ description: "Old item", qty: 1, price: 500 }],
+    });
+    const [newPatient] = await admin<
+      { id: string }[]
+    >`insert into public.patients (clinic_id, full_name) values (${clinicA}, 'Second Billing Patient') returning id`;
+    await asUserCommitted(
+      u.recepA,
+      (tx) =>
+        tx`select public.update_draft_invoice(${clinicA}, ${id}, ${newPatient!.id}, current_date + 14, ${tx.json([{ description: "Updated", quantity: 2, unit_price_centavos: 700 }] as never)})`,
+    );
     expect((await totals(id))?.total_centavos).toBe("1400");
-    const [invoice] = await admin<{ patient_id: string; due_on: string }[]>`select patient_id, due_on from public.invoices where id = ${id}`;
+    const [invoice] = await admin<
+      { patient_id: string; due_on: string }[]
+    >`select patient_id, due_on from public.invoices where id = ${id}`;
     expect(invoice?.patient_id).toBe(newPatient?.id);
-    const [item] = await admin<{ description: string }[]>`select description from public.invoice_items where invoice_id = ${id}`;
+    const [item] = await admin<
+      { description: string }[]
+    >`select description from public.invoice_items where invoice_id = ${id}`;
     expect(item?.description).toBe("Updated");
   });
 
   it("rolls back all edits when an item fails validation", async () => {
-    const id = await makeInvoice(u.recepA, { items: [{ description: "Keep me", qty: 1, price: 500 }] });
-    const [newPatient] = await admin<{ id: string }[]>`insert into public.patients (clinic_id, full_name) values (${clinicA}, 'Rollback Patient') returning id`;
-    const err = await failure(u.recepA, (tx) => tx`select public.update_draft_invoice(${clinicA}, ${id}, ${newPatient!.id}, current_date + 14, ${tx.json([{ description: "Bad", quantity: 0, unit_price_centavos: 700 }] as never)})`);
+    const id = await makeInvoice(u.recepA, {
+      items: [{ description: "Keep me", qty: 1, price: 500 }],
+    });
+    const [newPatient] = await admin<
+      { id: string }[]
+    >`insert into public.patients (clinic_id, full_name) values (${clinicA}, 'Rollback Patient') returning id`;
+    const err = await failure(
+      u.recepA,
+      (tx) =>
+        tx`select public.update_draft_invoice(${clinicA}, ${id}, ${newPatient!.id}, current_date + 14, ${tx.json([{ description: "Bad", quantity: 0, unit_price_centavos: 700 }] as never)})`,
+    );
     expect(err.code).toBe("23514");
-    const [item] = await admin<{ description: string }[]>`select description from public.invoice_items where invoice_id = ${id}`;
+    const [item] = await admin<
+      { description: string }[]
+    >`select description from public.invoice_items where invoice_id = ${id}`;
     expect(item?.description).toBe("Keep me");
     expect((await totals(id))?.total_centavos).toBe("500");
   });
 
   it("refuses to edit a sent invoice", async () => {
     const id = await makeInvoice(u.recepA, { send: true });
-    const err = await failure(u.recepA, (tx) => tx`select public.update_draft_invoice(${clinicA}, ${id}, ${patientA}, current_date + 14, ${tx.json([{ description: "Updated", quantity: 1, unit_price_centavos: 700 }] as never)})`);
+    const err = await failure(
+      u.recepA,
+      (tx) =>
+        tx`select public.update_draft_invoice(${clinicA}, ${id}, ${patientA}, current_date + 14, ${tx.json([{ description: "Updated", quantity: 1, unit_price_centavos: 700 }] as never)})`,
+    );
     expect(err.code).toBe("P0001");
   });
 
@@ -250,7 +276,11 @@ describe("update_draft_invoice (atomic)", () => {
       await tx`insert into public.payments (clinic_id, invoice_id, method, amount_centavos, status, provider, paid_at)
                values (${clinicA}, ${id}, 'cash', 150000, 'succeeded', 'manual', now())`;
     });
-    const err = await failure(u.recepA, (tx) => tx`select public.update_draft_invoice(${clinicA}, ${id}, ${patientA}, current_date + 14, ${tx.json([{ description: "Updated", quantity: 1, unit_price_centavos: 700 }] as never)})`);
+    const err = await failure(
+      u.recepA,
+      (tx) =>
+        tx`select public.update_draft_invoice(${clinicA}, ${id}, ${patientA}, current_date + 14, ${tx.json([{ description: "Updated", quantity: 1, unit_price_centavos: 700 }] as never)})`,
+    );
     expect(err.code).toBe("P0001");
   });
 });
@@ -535,7 +565,7 @@ describe("provider webhook (apply_provider_payment)", () => {
   });
 });
 
-describe("balance and mock payouts", () => {
+describe("balance and payouts", () => {
   const balance = async (who: string) =>
     asUser(
       who,
@@ -568,17 +598,20 @@ describe("balance and mock payouts", () => {
     );
     await applyEvent("evt_" + Math.random().toString(36).slice(2, 12), ref, 70000);
     expect(BigInt((await balance(u.ownerA)) ?? "0")).toBe(before + 70000n);
+
+    await admin`insert into public.payouts (clinic_id, amount_centavos, destination, arrives_on, is_mock)
+      values (${clinicA}, 10000, 'QA payout', current_date + 1, true)`;
+    expect(BigInt((await balance(u.ownerA)) ?? "0")).toBe(before + 70000n);
+
+    await admin`insert into public.payouts (clinic_id, amount_centavos, destination, arrives_on, is_mock)
+      values (${clinicA}, 5000, 'Provider payout', current_date + 1, false)`;
+    expect(BigInt((await balance(u.ownerA)) ?? "0")).toBe(before + 65000n);
   });
 
-  it("only owner and billing can see balance, payouts or request one", async () => {
+  it("only owner and billing can see balance or payouts", async () => {
     for (const who of [u.recepA, u.doctorA]) {
       const err = await failure(who, (tx) => tx`select public.clinic_balance(${clinicA})`);
       expect(err.code).toBe("42501");
-      const po = await failure(
-        who,
-        (tx) => tx`select public.request_payout(${clinicA}, 100, 'BDO ••1920', current_date + 1)`,
-      );
-      expect(po.code).toBe("42501");
       await asUser(who, async (tx) =>
         expect(await tx`select 1 from public.payouts`).toHaveLength(0),
       );
@@ -587,31 +620,17 @@ describe("balance and mock payouts", () => {
     expect(cross.code).toBe("42501");
   });
 
-  it("rejects a withdrawal above the balance and reduces the balance after a valid one", async () => {
-    const bal = BigInt((await balance(u.billingA)) ?? "0");
-    const tooMuch = await failure(
-      u.billingA,
-      (tx) =>
-        tx`select public.request_payout(${clinicA}, ${(bal + 1n).toString()}, 'BDO ••1920', current_date + 1)`,
-    );
-    expect(tooMuch.message).toMatch(/more than the available balance/);
-    await asUserCommitted(
-      u.billingA,
-      (tx) => tx`select public.request_payout(${clinicA}, 10000, 'BDO ••1920', current_date + 1)`,
-    );
-    expect(BigInt((await balance(u.billingA)) ?? "0")).toBe(bal - 10000n);
-    const [p] = await admin<
-      { is_mock: boolean; status: string }[]
-    >`select is_mock, status from public.payouts where clinic_id = ${clinicA} order by created_at desc limit 1`;
-    expect(p).toMatchObject({ is_mock: true, status: "processing" });
+  it("does not expose the SECURITY DEFINER balance helper to authenticated users", async () => {
+    for (const who of [u.ownerA, u.ownerB]) {
+      const err = await failure(who, (tx) => tx`select private.available_balance(${clinicA})`);
+      expect(err.code).toBe("42501");
+    }
   });
 
-  it("rejects zero or negative amounts and direct inserts", async () => {
-    const zero = await failure(
-      u.ownerA,
-      (tx) => tx`select public.request_payout(${clinicA}, 0, 'BDO', current_date + 1)`,
-    );
-    expect(zero.code).toBe("22023");
+  it("removes the unavailable payout request RPC and blocks direct inserts", async () => {
+    const [rpc] = await admin<{ signature: string | null }[]>`
+      select to_regprocedure('public.request_payout(uuid,bigint,text,date)')::text as signature`;
+    expect(rpc?.signature).toBeNull();
     const direct = await failure(
       u.ownerA,
       (tx) =>

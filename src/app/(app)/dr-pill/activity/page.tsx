@@ -8,12 +8,18 @@ import { requireCapability } from "@/features/auth/workspace";
 import { OfferActions } from "@/features/chair-filler/components/offer-card";
 import { getChairFillerSummary, listOffers } from "@/features/chair-filler/queries";
 import { can } from "@/features/auth/permissions";
-import { actionCountsSince, listActions, listMcpPaymentRequests } from "@/features/assistant/queries";
+import {
+  ACTION_PAGE_SIZE,
+  actionCountsSince,
+  listActions,
+  listMcpPaymentRequests,
+} from "@/features/assistant/queries";
 import { McpPaymentRequests } from "@/features/mcp/components/payment-requests";
 import { formatPHP } from "@/lib/money";
 import { dateOf, formatDateShort, formatTime, todayIn, zonedToUtcIso } from "@/lib/datetime";
 
 export const metadata: Metadata = { title: "Dr. Pill activity" };
+type Props = { searchParams: Promise<{ page?: string }> };
 
 const KIND_LABEL: Record<string, string> = {
   book_appointment: "Booked an appointment",
@@ -21,8 +27,10 @@ const KIND_LABEL: Record<string, string> = {
   handoff: "Handed a chat to staff",
 };
 
-export default async function ActivityPage() {
+export default async function ActivityPage({ searchParams }: Props) {
   const { membership } = await requireCapability("inbox.view");
+  const params = await searchParams;
+  const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
   const clinic = membership.clinic;
   const tz = clinic.timezone;
   const today = todayIn(tz);
@@ -30,14 +38,16 @@ export default async function ActivityPage() {
     can(membership.role, "inbox.view") &&
     membership.role !== "doctor" &&
     membership.role !== "billing";
-  const [actions, counts, offers, summary, mcpPaymentRequests] = await Promise.all([
-    listActions(clinic.id),
-    actionCountsSince(clinic.id, zonedToUtcIso(today, "00:00", tz)),
-    canOffers ? listOffers(clinic.id) : Promise.resolve([]),
-    canOffers ? getChairFillerSummary(clinic.id) : Promise.resolve(null),
-    canOffers ? listMcpPaymentRequests(clinic.id) : Promise.resolve([]),
-  ]);
+  const [{ rows: actions, total: actionTotal }, counts, offers, summary, mcpPaymentRequests] =
+    await Promise.all([
+      listActions(clinic.id, page),
+      actionCountsSince(clinic.id, zonedToUtcIso(today, "00:00", tz)),
+      canOffers ? listOffers(clinic.id) : Promise.resolve([]),
+      canOffers ? getChairFillerSummary(clinic.id) : Promise.resolve(null),
+      canOffers ? listMcpPaymentRequests(clinic.id) : Promise.resolve([]),
+    ]);
   const open = offers.filter((o) => o.status === "proposed" || o.status === "sent");
+  const actionPages = Math.max(1, Math.ceil(actionTotal / ACTION_PAGE_SIZE));
 
   return (
     <>
@@ -77,7 +87,10 @@ export default async function ActivityPage() {
         <Card className="flex flex-col gap-4">
           <div>
             <CardTitle>MCP payment requests</CardTitle>
-            <p className="text-muted">MCP clients cannot create payment links directly. Review each request before a link is created.</p>
+            <p className="text-muted">
+              MCP clients cannot create payment links directly. Review each request before a link is
+              created.
+            </p>
           </div>
           <McpPaymentRequests requests={mcpPaymentRequests} />
         </Card>
@@ -178,6 +191,34 @@ export default async function ActivityPage() {
             ))}
           </ul>
         )}
+        <nav
+          aria-label="Activity pages"
+          className="border-line flex flex-wrap items-center justify-between gap-3 border-t pt-4"
+        >
+          <span className="text-muted text-sm">
+            Showing {actionTotal === 0 ? 0 : (page - 1) * ACTION_PAGE_SIZE + 1}–
+            {Math.min(page * ACTION_PAGE_SIZE, actionTotal)} of {actionTotal} · {ACTION_PAGE_SIZE}{" "}
+            per page
+          </span>
+          <div className="flex gap-2">
+            <Link
+              aria-disabled={page <= 1}
+              tabIndex={page <= 1 ? -1 : undefined}
+              className="border-line inline-flex min-h-11 items-center rounded-full border px-4 text-sm aria-disabled:pointer-events-none aria-disabled:opacity-40"
+              href={`/dr-pill/activity${page > 2 ? `?page=${page - 1}` : ""}`}
+            >
+              Previous
+            </Link>
+            <Link
+              aria-disabled={page >= actionPages}
+              tabIndex={page >= actionPages ? -1 : undefined}
+              className="border-line inline-flex min-h-11 items-center rounded-full border px-4 text-sm aria-disabled:pointer-events-none aria-disabled:opacity-40"
+              href={`/dr-pill/activity?page=${Math.min(actionPages, page + 1)}`}
+            >
+              Next
+            </Link>
+          </div>
+        </nav>
       </Card>
     </>
   );

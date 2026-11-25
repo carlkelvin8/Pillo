@@ -45,6 +45,10 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const patient = (await patientNames(clinic.id, [invoice.patient_id])).get(invoice.patient_id);
   const status = displayStatus(invoice.status, invoice.due_on, todayIn(tz));
   const paid = amountPaid(payments);
+  const succeededPayments = payments
+    .filter((payment) => payment.status === "succeeded" && payment.paid_at)
+    .sort((a, b) => (a.paid_at ?? "").localeCompare(b.paid_at ?? ""));
+  const latestPayment = succeededPayments.at(-1);
   const due = Math.max(0, invoice.total_centavos - paid);
   const openLink = payments.find((p) => p.status === "pending" && p.checkout_url);
   const canCollect = invoice.status === "draft" || invoice.status === "sent";
@@ -82,11 +86,26 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           <Chip tone={STATUS_TONE[status]}>{STATUS_LABEL[status]}</Chip>
         </div>
       </div>
-      {invoice.status === "draft" ? <DraftInvoiceEditor invoiceId={invoice.id} dueOn={invoice.due_on} patient={patient ? { id: invoice.patient_id, ...patient } : null} items={items} /> : null}
+      {invoice.status === "draft" ? (
+        <DraftInvoiceEditor
+          invoiceId={invoice.id}
+          dueOn={invoice.due_on}
+          patient={patient ? { id: invoice.patient_id, ...patient } : null}
+          items={items}
+        />
+      ) : null}
 
       <div className="grid items-start gap-6 lg:grid-cols-[1.7fr_1fr]">
         <Card className="flex flex-col gap-6">
-            <a href={`/api/invoices/${invoice.id}/pdf`} className="text-ink min-h-11 w-fit font-medium underline">Download PDF</a>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle>Invoice details</CardTitle>
+            <a
+              href={`/api/invoices/${invoice.id}/pdf`}
+              className="text-ink inline-flex min-h-11 items-center font-medium underline underline-offset-4"
+            >
+              Download PDF
+            </a>
+          </div>
           <div className="flex flex-wrap justify-between gap-4">
             <div>
               <p className="font-semibold">{clinic.name}</p>
@@ -169,8 +188,53 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         <div className="flex flex-col gap-6">
           <Card className="flex flex-col gap-4">
             <CardTitle>Payment</CardTitle>
-            {invoice.status === "paid" ? (
-              <p className="rounded-control bg-mint text-mint-ink p-4 font-medium">Paid in full.</p>
+            {paid > 0 ? (
+              <section aria-label="Payment receipt" className="rounded-control bg-mint p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-mint-ink text-sm font-semibold">Total received</p>
+                    <p className="tabular mt-1 text-2xl font-semibold tracking-tight">
+                      {formatPHP(paid)}
+                    </p>
+                  </div>
+                  {invoice.status === "paid" ? <Chip tone="success">Paid in full</Chip> : null}
+                </div>
+                <dl className="text-mint-ink border-mint-ink/15 mt-4 flex flex-col gap-2 border-t pt-3 text-sm">
+                  {latestPayment ? (
+                    <div className="text-mint-ink/75 pb-1 text-xs font-semibold tracking-wide uppercase">
+                      Latest payment
+                    </div>
+                  ) : null}
+                  {latestPayment ? (
+                    <div className="flex justify-between gap-3">
+                      <dt>Amount</dt>
+                      <dd className="tabular font-medium">
+                        {formatPHP(latestPayment.amount_centavos)}
+                      </dd>
+                    </div>
+                  ) : null}
+                  {latestPayment?.method ? (
+                    <div className="flex justify-between gap-3">
+                      <dt>Method</dt>
+                      <dd className="font-medium">{METHOD_LABEL[latestPayment.method]}</dd>
+                    </div>
+                  ) : null}
+                  {latestPayment?.paid_at ? (
+                    <div className="flex justify-between gap-3">
+                      <dt>Received</dt>
+                      <dd className="tabular font-medium">{when(latestPayment.paid_at)}</dd>
+                    </div>
+                  ) : null}
+                  {latestPayment?.reference || latestPayment?.provider_ref ? (
+                    <div className="flex justify-between gap-3">
+                      <dt>Reference</dt>
+                      <dd className="max-w-40 truncate font-medium">
+                        {latestPayment.reference ?? latestPayment.provider_ref}
+                      </dd>
+                    </div>
+                  ) : null}
+                </dl>
+              </section>
             ) : null}
             {invoice.status === "void" ? (
               <p className="text-muted">This invoice was voided.</p>
@@ -186,7 +250,11 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                   </p>
                 ) : null}
                 <CopyLink url={openLink.checkout_url} />
-                <ShareInvoiceMessage invoiceId={invoice.id} invoiceNumber={invoice.invoice_number} url={openLink.checkout_url} />
+                <ShareInvoiceMessage
+                  invoiceId={invoice.id}
+                  invoiceNumber={invoice.invoice_number}
+                  url={openLink.checkout_url}
+                />
                 <CancelLinkButton paymentId={openLink.id} invoiceId={invoice.id} />
               </div>
             ) : null}

@@ -16,6 +16,7 @@ import {
 } from "./schemas";
 import { dayBoundsUtc } from "@/lib/datetime";
 import type { HourWindow } from "./slots";
+import { countAppointmentStartsByMonth } from "./dashboard-trend";
 
 function check(error: { code?: string } | null, what: string): void {
   if (error) throw new Error(`Could not load ${what} (${error.code ?? "error"})`);
@@ -96,6 +97,38 @@ export async function listAppointments(
   const { data, error } = await query;
   check(error, "appointments");
   return z.array(appointmentRowSchema).parse(data ?? []);
+}
+
+/** Monthly appointment counts without loading patient or appointment details. */
+export async function monthlyAppointmentCounts(
+  clinicId: string,
+  fromIso: string,
+  toIso: string,
+  timezone: string,
+): Promise<Map<string, number>> {
+  const supabase = await createClient();
+  const startsAt: string[] = [];
+  const pageSize = 1_000;
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("appointments")
+      .select("starts_at")
+      .eq("clinic_id", clinicId)
+      .neq("status", "cancelled")
+      .gte("starts_at", fromIso)
+      .lt("starts_at", toIso)
+      .order("starts_at", { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    check(error, "appointment trend");
+    const page = z.array(z.object({ starts_at: z.string() })).parse(data ?? []);
+    startsAt.push(...page.map((appointment) => appointment.starts_at));
+    if (page.length < pageSize) break;
+    offset += pageSize;
+  }
+
+  return countAppointmentStartsByMonth(startsAt, timezone);
 }
 
 export async function listWaitlist(clinicId: string): Promise<WaitlistRow[]> {

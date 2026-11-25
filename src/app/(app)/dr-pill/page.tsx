@@ -12,6 +12,7 @@ import {
   ConversationControls,
   ReplyForm,
 } from "@/features/assistant/components/inbox-controls";
+import { MessageThread } from "@/features/assistant/components/message-thread";
 import {
   conversationMessages,
   getConversation,
@@ -25,6 +26,7 @@ import {
 import { patientNames } from "@/features/patients/queries";
 import { dateOf, formatDateShort, formatTime, todayIn } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
+import { ConversationList } from "@/features/assistant/components/conversation-list";
 
 export const metadata: Metadata = { title: "Dr. Pill" };
 
@@ -49,8 +51,8 @@ export default async function InboxPage({ searchParams }: Props) {
   const filter: InboxFilter = params.filter === "needs" ? "needs" : "all";
   const selectedId = params.c && /^[0-9a-f-]{36}$/i.test(params.c) ? params.c : undefined;
 
-  const [list, needs] = await Promise.all([
-    listConversations(clinic.id, filter),
+  const [{ rows: list, total }, needs] = await Promise.all([
+    listConversations(clinic.id, filter, 1),
     needsHumanCount(clinic.id),
   ]);
   const previews = await lastMessages(list.map((c) => c.id));
@@ -81,7 +83,7 @@ export default async function InboxPage({ searchParams }: Props) {
       <PageHeader eyebrow="Assistant" title="Dr. Pill" />
       <DrPillTabs active="conversations" isOwner={can(membership.role, "staff.manage")} />
 
-      <div className="grid items-stretch gap-6 lg:grid-cols-[360px_1fr]">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
         <Card className="flex flex-col gap-3 p-3">
           <div className="flex gap-1.5 px-1 pt-1">
             <Link
@@ -120,35 +122,23 @@ export default async function InboxPage({ searchParams }: Props) {
               </p>
             </div>
           ) : (
-            <ul className="flex flex-col">
-              {list.map((c) => (
-                <li key={c.id}>
-                  <Link
-                    href={href(c.id)}
-                    aria-current={c.id === selectedId ? "true" : undefined}
-                    className={cn(
-                      "rounded-control hover:bg-canvas flex min-h-11 flex-col gap-1 px-3 py-3",
-                      c.id === selectedId && "bg-canvas",
-                    )}
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="truncate font-semibold">{label(c)}</span>
-                      <span className="tabular text-muted shrink-0 text-xs">
-                        {when(c.last_message_at)}
-                      </span>
-                    </span>
-                    <span className="text-muted truncate text-sm">
-                      {previews.get(c.id) ?? "No messages"}
-                    </span>
-                    <span>{statusChip(c)}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <ConversationList
+              initialItems={list.map((conversation) => ({
+                id: conversation.id,
+                status: conversation.status,
+                handledBy: conversation.handled_by,
+                label: label(conversation),
+                time: when(conversation.last_message_at),
+                preview: previews.get(conversation.id) ?? "No messages",
+              }))}
+              initialTotal={total}
+              filter={filter}
+              selectedId={selectedId}
+            />
           )}
         </Card>
 
-        <Card className="flex min-h-96 flex-col gap-4">
+        <Card className="flex h-[min(76vh,52rem)] min-h-[36rem] min-w-0 flex-col gap-5 p-6">
           {!selected ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16 text-center">
               <DrPillAvatar mood="happy" size={88} decorative />
@@ -181,42 +171,41 @@ export default async function InboxPage({ searchParams }: Props) {
                   {selected.handoff_summary}
                 </p>
               ) : null}
-              <ol
-                aria-label="Messages"
-                className="flex max-h-[28rem] flex-col gap-3 overflow-y-auto"
-              >
-                {messages.map((m) => (
-                  <li
-                    key={m.id}
-                    className={cn(
-                      "flex flex-col gap-1",
-                      m.role === "patient" ? "items-start" : "items-end",
-                    )}
-                  >
-                    <span className="text-muted text-xs">
-                      {m.role === "patient"
-                        ? "Patient"
-                        : m.role === "assistant"
-                          ? "Dr. Pill"
-                          : m.role === "staff"
-                            ? "Staff"
-                            : "System"}{" "}
-                      · <span className="tabular">{formatTime(m.created_at, tz)}</span>
-                    </span>
-                    <p
+              <MessageThread messageCount={messages.length}>
+                <ol aria-label="Messages" className="flex flex-col gap-4">
+                  {messages.map((m) => (
+                    <li
+                      key={m.id}
                       className={cn(
-                        "rounded-card max-w-[85%] px-4 py-2.5 text-sm whitespace-pre-line",
-                        m.role === "patient" && "border-line-strong bg-surface border",
-                        m.role === "assistant" && "bg-mint text-ink",
-                        m.role === "staff" && "bg-ink text-surface",
-                        m.role === "system" && "bg-subtle text-muted",
+                        "flex flex-col gap-1",
+                        m.role === "patient" ? "items-start" : "items-end",
                       )}
                     >
-                      {m.content}
-                    </p>
-                  </li>
-                ))}
-              </ol>
+                      <span className="text-muted text-xs">
+                        {m.role === "patient"
+                          ? "Patient"
+                          : m.role === "assistant"
+                            ? "Dr. Pill"
+                            : m.role === "staff"
+                              ? "Staff"
+                              : "System"}{" "}
+                        · <span className="tabular">{formatTime(m.created_at, tz)}</span>
+                      </span>
+                      <p
+                        className={cn(
+                          "rounded-card shadow-card max-w-[min(88%,44rem)] px-4 py-3 text-sm leading-6 whitespace-pre-line",
+                          m.role === "patient" && "border-line-strong bg-surface border",
+                          m.role === "assistant" && "bg-mint text-ink",
+                          m.role === "staff" && "bg-ink text-surface",
+                          m.role === "system" && "bg-subtle text-muted",
+                        )}
+                      >
+                        {m.content}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              </MessageThread>
               {selected.status !== "resolved" ? (
                 <ReplyForm conversationId={selected.id} />
               ) : (

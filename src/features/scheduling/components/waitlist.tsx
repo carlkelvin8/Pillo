@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Field } from "@/components/ui/field";
@@ -87,7 +88,11 @@ export function AddToWaitlistDialog({ doctors }: { doctors: DoctorOption[] }) {
     <FormDialog
       title="Add to waitlist"
       description="Patients who want an earlier slot."
-      trigger={<Button variant="ghost">Add</Button>}
+      trigger={
+        <Button variant="mint" className="min-h-10 px-3">
+          <Plus aria-hidden="true" /> Add
+        </Button>
+      }
     >
       {(close) => <WaitlistForm doctors={doctors} onDone={close} />}
     </FormDialog>
@@ -101,6 +106,7 @@ export function WaitlistRemoveButton({ entryId, name }: { entryId: string; name:
       <input type="hidden" name="entryId" value={entryId} />
       <SubmitButton
         variant="ghost"
+        className="min-h-9 px-3 text-xs"
         pendingLabel="Removing…"
         aria-label={`Remove ${name} from the waitlist`}
       >

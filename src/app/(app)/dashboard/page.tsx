@@ -6,27 +6,21 @@ import { Chip } from "@/components/ui/chip";
 import { can } from "@/features/auth/permissions";
 import { requireMembership } from "@/features/auth/workspace";
 import { getChairFillerSummary } from "@/features/chair-filler/queries";
+import { AppointmentsLineChart, CollectionsBarChart } from "@/features/dashboard/trend-charts";
 import { invoiceStats } from "@/features/invoices/queries";
 import { BalanceHero } from "@/features/payments/components/balance-hero";
-import { WithdrawDialog } from "@/features/payments/components/withdraw-dialog";
+import { dashboardAnalyticsLayout } from "@/features/dashboard/layout";
 import {
   collectionsData,
   getBalance,
   listTransactions,
   sumOnDay,
 } from "@/features/payments/queries";
-import { patientNames } from "@/features/patients/queries";
-import { listAppointments } from "@/features/scheduling/queries";
+import { patientNames, patientStats } from "@/features/patients/queries";
+import { appointmentTrendRange } from "@/features/scheduling/dashboard-trend";
+import { listAppointments, monthlyAppointmentCounts } from "@/features/scheduling/queries";
 import { STATUS_LABEL, STATUS_TONE } from "@/features/scheduling/status";
-import {
-  dayBoundsUtc,
-  formatDateShort,
-  formatTime,
-  lastMonths,
-  nextBusinessDay,
-  todayIn,
-  zonedToUtcIso,
-} from "@/lib/datetime";
+import { dayBoundsUtc, formatTime, lastMonths, todayIn, zonedToUtcIso } from "@/lib/datetime";
 import { formatPHP } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
@@ -34,8 +28,6 @@ export const metadata: Metadata = { title: "Dashboard" };
 
 const greeting = (hour: number) =>
   hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-const MONTH = new Intl.DateTimeFormat("en-PH", { month: "short", timeZone: "UTC" });
-
 function Tile({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
     <Card className="flex flex-col gap-1 p-6">
@@ -67,22 +59,29 @@ export default async function DashboardPage() {
   const showMoney = can(role, "payments.manage");
   const showInvoices = can(role, "invoices.create");
   const showSchedule = can(role, "schedule.view");
+  const showPatients = can(role, "patients.directory");
   const monthStartIso = zonedToUtcIso(`${today.slice(0, 8)}01`, "00:00", tz);
   const months = lastMonths(today, 12);
+  const appointmentRange = appointmentTrendRange(today, tz);
   const sinceIso = zonedToUtcIso(`${months[0]}-01`, "00:00", tz);
   const { start, end } = dayBoundsUtc(today, tz);
 
   const showRecovered = can(role, "staff.manage");
-  const [balance, collections, tx, inv, todays, recovered] = await Promise.all([
-    showMoney ? getBalance(clinic.id) : Promise.resolve(0),
-    showMoney ? collectionsData(clinic.id, sinceIso, tz) : Promise.resolve(null),
-    showMoney ? listTransactions(clinic.id, 5) : Promise.resolve(null),
-    showInvoices ? invoiceStats(clinic.id, today, monthStartIso) : Promise.resolve(null),
-    showSchedule
-      ? listAppointments(clinic.id, { fromIso: start, toIso: end })
-      : Promise.resolve([]),
-    showRecovered ? getChairFillerSummary(clinic.id) : Promise.resolve(null),
-  ]);
+  const [balance, collections, tx, inv, todays, recovered, appointmentTrend, patients] =
+    await Promise.all([
+      showMoney ? getBalance(clinic.id) : Promise.resolve(0),
+      showMoney ? collectionsData(clinic.id, sinceIso, tz) : Promise.resolve(null),
+      showMoney ? listTransactions(clinic.id, 5) : Promise.resolve(null),
+      showInvoices ? invoiceStats(clinic.id, today, monthStartIso) : Promise.resolve(null),
+      showSchedule
+        ? listAppointments(clinic.id, { fromIso: start, toIso: end })
+        : Promise.resolve([]),
+      showRecovered ? getChairFillerSummary(clinic.id) : Promise.resolve(null),
+      showSchedule
+        ? monthlyAppointmentCounts(clinic.id, appointmentRange.fromIso, appointmentRange.toIso, tz)
+        : Promise.resolve(new Map<string, number>()),
+      showPatients ? patientStats(clinic.id, monthStartIso) : Promise.resolve(null),
+    ]);
   const names = showSchedule
     ? await patientNames(
         clinic.id,
@@ -97,70 +96,36 @@ export default async function DashboardPage() {
         tz,
       )
     : null;
-  const pendingPayouts = tx
-    ? tx.payouts.filter((p) => p.status === "processing").reduce((a, p) => a + p.amount_centavos, 0)
-    : 0;
   const nowIso = now.toISOString();
   const remaining = todays.filter(
     (a) => a.ends_at > nowIso && (a.status === "scheduled" || a.status === "confirmed"),
   );
   const monthTotals = months.map((m) => collections?.byMonth.get(m) ?? 0);
-  const maxMonth = Math.max(1, ...monthTotals);
   const yearTotal = monthTotals.reduce((a, b) => a + b, 0);
   const canOpenPatients = can(role, "patients.directory");
+  const analyticsLayout = dashboardAnalyticsLayout();
 
   return (
     <>
       <PageHeader eyebrow={date} title={`${greeting(hour)}, ${firstName}`} />
 
       {showMoney ? (
-        <div className="grid items-stretch gap-6 lg:grid-cols-[1.5fr_1fr]">
-          <BalanceHero centavos={balance}>
-            <WithdrawDialog available={balance} arrives={formatDateShort(nextBusinessDay(today))} />
-          </BalanceHero>
-          <Card className="flex flex-col gap-4">
-            <div className="flex items-baseline justify-between gap-3">
-              <CardTitle>Collections</CardTitle>
-              <span className="tabular text-muted text-sm">Last 12 months</span>
-            </div>
-            <p className="tabular text-3xl font-semibold tracking-tight">{formatPHP(yearTotal)}</p>
-            <div
-              className="flex h-28 items-end gap-1.5"
-              role="img"
-              aria-label={`Collections by month, total ${formatPHP(yearTotal)}`}
-            >
-              {monthTotals.map((v, i) => (
-                <div
-                  key={months[i]}
-                  className="flex h-full flex-1 flex-col items-center justify-end gap-1"
-                >
-                  <div
-                    className={cn("w-full rounded-t-[4px]", v > 0 ? "bg-mint-strong" : "bg-subtle")}
-                    style={{ height: `${Math.max(4, (v / maxMonth) * 100)}%` }}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="text-muted flex justify-between text-xs" aria-hidden="true">
-              <span>{MONTH.format(new Date(`${months[0]}-01T00:00:00Z`))}</span>
-              <span>{MONTH.format(new Date(`${months[months.length - 1]}-01T00:00:00Z`))}</span>
-            </div>
-            <table className="sr-only">
-              <caption>Collections by month</caption>
-              <tbody>
-                {months.map((m, i) => (
-                  <tr key={m}>
-                    <th scope="row">{m}</th>
-                    <td>{formatPHP(monthTotals[i] ?? 0)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
+        <div className={`grid items-stretch gap-6 ${analyticsLayout.columns}`}>
+          <BalanceHero centavos={balance} />
+          {collections ? (
+            <CollectionsBarChart months={months} values={monthTotals} total={yearTotal} />
+          ) : null}
         </div>
       ) : null}
 
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+      {showSchedule ? (
+        <AppointmentsLineChart
+          months={months}
+          values={months.map((month) => appointmentTrend.get(month) ?? 0)}
+        />
+      ) : null}
+
+      <div className="grid items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-5">
         {collectedToday ? (
           <Tile
             label="Collected today"
@@ -190,14 +155,18 @@ export default async function DashboardPage() {
             }
           />
         ) : null}
-        {showMoney ? (
-          <Tile label="Pending payouts" value={formatPHP(pendingPayouts)} hint="Demo payouts" />
-        ) : null}
         {showSchedule ? (
           <Tile
             label="Appointments"
             value={String(todays.filter((a) => a.status !== "cancelled").length)}
             hint={`${remaining.length} remaining today`}
+          />
+        ) : null}
+        {patients ? (
+          <Tile
+            label="Registered patients"
+            value={patients.total.toLocaleString("en-PH")}
+            hint={`${patients.newThisMonth.toLocaleString("en-PH")} added this month`}
           />
         ) : null}
       </div>
@@ -220,23 +189,15 @@ export default async function DashboardPage() {
               <ul className="divide-line flex flex-col divide-y">
                 {tx.items.map((t) => (
                   <li
-                    key={`${t.kind}-${t.id}`}
+                    key={t.id}
                     className="flex flex-wrap items-center gap-3 py-3 first:pt-0 last:pb-0"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-semibold">{t.title}</p>
                       <p className="text-muted truncate text-sm">{t.subtitle}</p>
                     </div>
-                    <Chip
-                      tone={t.status === "paid" || t.status === "completed" ? "success" : "pending"}
-                    >
-                      {t.status === "paid"
-                        ? "Paid"
-                        : t.status === "completed"
-                          ? "Completed"
-                          : t.status === "processing"
-                            ? "Processing"
-                            : "Pending"}
+                    <Chip tone={t.status === "paid" ? "success" : "pending"}>
+                      {t.status === "paid" ? "Paid" : "Pending"}
                     </Chip>
                     <span
                       className={cn(

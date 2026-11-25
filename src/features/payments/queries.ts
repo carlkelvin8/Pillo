@@ -24,27 +24,18 @@ const paymentRow = z.object({
   paid_at: z.string().nullable(),
   created_at: z.string(),
 });
-const payoutRow = z.object({
-  id: z.string(),
-  amount_centavos: z.coerce.number(),
-  destination: z.string(),
-  status: z.enum(["processing", "paid", "cancelled"]),
-  arrives_on: z.string(),
-  is_mock: z.boolean(),
-  created_at: z.string(),
-});
-export type PayoutRow = z.infer<typeof payoutRow>;
-
 export type Transaction = {
   id: string;
-  kind: "incoming" | "outgoing";
   title: string;
   subtitle: string;
-  status: "paid" | "pending" | "processing" | "completed";
+  status: "paid" | "pending";
   centavos: number;
   at: string;
   invoiceId?: string;
 };
+
+export const TRANSACTION_PAGE_SIZE = 20;
+export type TransactionFilter = "all" | "pending";
 
 const METHOD_LABEL = {
   gcash: "GCash",
@@ -56,32 +47,33 @@ const METHOD_LABEL = {
 export const methodLabel = (m: keyof typeof METHOD_LABEL | null) =>
   m ? METHOD_LABEL[m] : "Awaiting payment";
 
-/** Latest incoming payments and outgoing payouts, newest first. */
+/** Latest incoming payments, newest first. */
 export async function listTransactions(
   clinicId: string,
-  limit = 30,
-): Promise<{ items: Transaction[]; payouts: PayoutRow[] }> {
+  limitOrPage: number | { page: number; filter: TransactionFilter } = 30,
+): Promise<{ items: Transaction[]; total: number }> {
   const supabase = await createClient();
-  const [pay, out] = await Promise.all([
-    supabase
-      .from("payments")
-      .select("id, invoice_id, method, amount_centavos, status, provider, paid_at, created_at")
-      .eq("clinic_id", clinicId)
-      .in("status", ["succeeded", "pending"])
-      .order("created_at", { ascending: false })
-      .limit(limit),
-    supabase
-      .from("payouts")
-      .select("id, amount_centavos, destination, status, arrives_on, is_mock, created_at")
-      .eq("clinic_id", clinicId)
-      .neq("status", "cancelled")
-      .order("created_at", { ascending: false })
-      .limit(limit),
-  ]);
-  check(pay.error, "payments");
-  check(out.error, "payouts");
-  const payments = z.array(paymentRow).parse(pay.data ?? []);
-  const payouts = z.array(payoutRow).parse(out.data ?? []);
+  const paginated = typeof limitOrPage !== "number";
+  const page = paginated ? Math.max(1, limitOrPage.page) : 1;
+  const filter = paginated ? limitOrPage.filter : "all";
+  let query = supabase
+    .from("payments")
+    .select("id, invoice_id, method, amount_centavos, status, provider, paid_at, created_at", {
+      count: paginated ? "exact" : undefined,
+    })
+    .eq("clinic_id", clinicId)
+    .in("status", ["succeeded", "pending"])
+    .order("created_at", { ascending: false });
+  if (filter === "pending") query = query.eq("status", "pending");
+  if (paginated) {
+    const from = (page - 1) * TRANSACTION_PAGE_SIZE;
+    query = query.range(from, from + TRANSACTION_PAGE_SIZE - 1);
+  } else {
+    query = query.limit(limitOrPage);
+  }
+  const { data, count, error } = await query;
+  check(error, "payments");
+  const payments = z.array(paymentRow).parse(data ?? []);
 
   const invoiceIds = [...new Set(payments.map((p) => p.invoice_id))];
   const invoiceInfo = new Map<string, { number: number; patientId: string }>();
@@ -112,7 +104,6 @@ export async function listTransactions(
       const inv = invoiceInfo.get(p.invoice_id);
       return {
         id: p.id,
-        kind: "incoming",
         title: (inv && patientName.get(inv.patientId)) ?? "Patient",
         subtitle: `INV-${String(inv?.number ?? 0).padStart(4, "0")} · ${methodLabel(p.method)}`,
         status: p.status === "succeeded" ? "paid" : "pending",
@@ -121,32 +112,29 @@ export async function listTransactions(
         invoiceId: p.invoice_id,
       };
     }),
-    ...payouts.map((p): Transaction => ({
-      id: p.id,
-      kind: "outgoing",
-      title: `Payout to ${p.destination}`,
-      subtitle: p.is_mock ? "Demo payout" : "Payout",
-      status: p.status === "processing" ? "processing" : "completed",
-      centavos: -p.amount_centavos,
-      at: p.created_at,
-    })),
   ];
-  items.sort((a, b) => b.at.localeCompare(a.at));
-  return { items: items.slice(0, limit), payouts };
+  return { items: paginated ? items : items.slice(0, limitOrPage), total: count ?? items.length };
 }
 
 /** Succeeded payments in the last ~12 months, for the collections chart and the payment-method mix. */
 export async function collectionsData(clinicId: string, sinceIso: string, tz: string) {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("payments")
-    .select("method, amount_centavos, paid_at")
-    .eq("clinic_id", clinicId)
-    .eq("status", "succeeded")
-    .gte("paid_at", sinceIso)
-    .order("paid_at", { ascending: true })
-    .limit(5000);
-  check(error, "collections");
+  const pageSize = 1000;
+  const data: unknown[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data: page, error } = await supabase
+      .from("payments")
+      .select("id, method, amount_centavos, paid_at")
+      .eq("clinic_id", clinicId)
+      .eq("status", "succeeded")
+      .gte("paid_at", sinceIso)
+      .order("paid_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+    check(error, "collections");
+    data.push(...(page ?? []));
+    if (!page || page.length < pageSize) break;
+  }
   const rows = z
     .array(
       z.object({

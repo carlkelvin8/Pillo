@@ -39,7 +39,7 @@
   --shadow-card: 0 1px 2px rgb(10 10 10 / 0.03), 0 12px 32px rgb(10 10 10 / 0.04);
 
   /* Type scale */
-  --text-title: 2.5rem;
+  --text-title: clamp(2rem, 3vw, 2.5rem);
   --text-title--line-height: 1.1;
   --text-title--letter-spacing: -0.03em;
   --text-title--font-weight: 600;
@@ -48,8 +48,8 @@
   --text-card-title--font-weight: 600;
 
   /* Layout */
-  --spacing-sidebar: 20rem;
-  --spacing-page: 3rem;
+  --spacing-sidebar: 16rem;
+  --spacing-page: clamp(1.5rem, 3vw, 3rem);
 }
 
 /* Numbers and money */
@@ -71,6 +71,62 @@
 
 .pill-avatar-glow {
   animation: pill-avatar-aura 1.8s ease-in-out infinite;
+}
+
+.pill-companion-float {
+  animation: pill-companion-float 3.2s ease-in-out infinite;
+}
+
+.pill-companion-avatar {
+  filter: drop-shadow(0 3px 8px var(--color-mint-strong));
+}
+
+.companion-status-pulse {
+  animation: companion-status-pulse 1.5s ease-in-out infinite;
+}
+
+.companion-notification-dot {
+  animation: companion-status-pulse 2.2s ease-in-out infinite;
+}
+
+.pill-companion-stethoscope,
+.pill-companion-syringe {
+  position: absolute;
+  z-index: 20;
+  top: 45%;
+  left: -0.5rem;
+  color: var(--color-mint-ink);
+  filter: drop-shadow(0 0 8px var(--color-mint-strong));
+}
+
+.pill-companion-stethoscope {
+  animation: pill-companion-checkup 1s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.pill-companion-syringe {
+  animation: pill-companion-syringe-care 1s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  main > * {
+    animation: page-enter 380ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  }
+
+  main > :nth-child(2) {
+    animation-delay: 45ms;
+  }
+
+  main > :nth-child(3) {
+    animation-delay: 90ms;
+  }
+
+  main > :nth-child(n + 4) {
+    animation-delay: 135ms;
+  }
+}
+
+.companion-panel-enter {
+  animation: companion-panel-enter 220ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
 }
 
 @keyframes pill-avatar-blink {
@@ -103,6 +159,98 @@
   50% {
     filter: drop-shadow(0 0 11px var(--color-mint-strong));
     transform: translateY(-2px);
+  }
+}
+
+@keyframes pill-companion-float {
+  0%,
+  100% {
+    transform: translateY(0);
+    filter: drop-shadow(0 3px 7px var(--color-mint-strong));
+  }
+  50% {
+    transform: translateY(-5px);
+    filter: drop-shadow(0 5px 14px var(--color-mint-strong));
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes companion-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes companion-status-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes pill-companion-checkup {
+  0% {
+    opacity: 0;
+    transform: translate(-12px, 8px) rotate(-35deg);
+  }
+  25% {
+    opacity: 1;
+    transform: translate(12px, 3px) rotate(-25deg);
+  }
+  55% {
+    opacity: 1;
+    transform: translate(44px, 0) rotate(-10deg);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(42px, 0) rotate(-10deg) scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(54px, -12px) rotate(10deg) scale(0.75);
+  }
+}
+
+@keyframes pill-companion-syringe-care {
+  0% {
+    opacity: 0;
+    transform: translate(-12px, 10px) rotate(-55deg) scale(0.72);
+  }
+  28% {
+    opacity: 1;
+    transform: translate(10px, 0) rotate(-25deg) scale(1.08);
+  }
+  58% {
+    opacity: 1;
+    transform: translate(42px, -6px) rotate(5deg) scale(1);
+  }
+  78% {
+    opacity: 1;
+    transform: translate(40px, -2px) rotate(-4deg) scale(0.94);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(54px, -15px) rotate(18deg) scale(0.7);
   }
 }
 

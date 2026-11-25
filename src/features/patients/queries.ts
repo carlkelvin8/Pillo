@@ -11,7 +11,7 @@ import {
 } from "./schemas";
 import { appointmentRowSchema, type AppointmentRow } from "@/features/scheduling/schemas";
 
-export const PAGE_SIZE = 25;
+export const PAGE_SIZE = 10;
 const PATIENT_COLUMNS =
   "id, patient_number, full_name, birthdate, sex, phone, email, consent_at, created_at";
 

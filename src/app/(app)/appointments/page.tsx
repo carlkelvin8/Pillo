@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -104,8 +104,9 @@ export default async function AppointmentsPage({ searchParams }: Props) {
 
   const weekStart = startOfWeek(anchor);
   const monthRange = view === "month" ? monthBounds(anchor) : null;
-  const rangeStart = view === "day" ? anchor : monthRange?.start ?? weekStart;
-  const rangeEndExclusive = view === "day" ? addDays(anchor, 1) : monthRange?.end ?? addDays(weekStart, 7);
+  const rangeStart = view === "day" ? anchor : (monthRange?.start ?? weekStart);
+  const rangeEndExclusive =
+    view === "day" ? addDays(anchor, 1) : (monthRange?.end ?? addDays(weekStart, 7));
   const { start: fromIso } = dayBoundsUtc(rangeStart, tz);
   const { start: toIso } = dayBoundsUtc(rangeEndExclusive, tz);
 
@@ -222,7 +223,11 @@ export default async function AppointmentsPage({ searchParams }: Props) {
     view === "day"
       ? `${WEEKDAY_NAMES[weekdayOf(anchor)]}, ${formatDateLong(anchor)}`
       : view === "month"
-        ? new Intl.DateTimeFormat("en-PH", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${monthRange?.start}T12:00:00Z`))
+        ? new Intl.DateTimeFormat("en-PH", {
+            month: "long",
+            year: "numeric",
+            timeZone: "UTC",
+          }).format(new Date(`${monthRange?.start}T12:00:00Z`))
         : formatWeekRange(days[0] ?? weekStart, days[days.length - 1] ?? weekStart);
 
   const doctorOptions = doctors.map((d) => ({
@@ -267,18 +272,26 @@ export default async function AppointmentsPage({ searchParams }: Props) {
         </p>
       ) : null}
 
-      <div className="grid items-start gap-6 xl:grid-cols-[1fr_300px]">
+      <div className="grid items-stretch gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <Card className="flex flex-col gap-4 p-4 sm:p-7">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Button asChild variant="ghost" size="icon" aria-label="Previous">
-                <Link href={href({ date: view === "month" ? shiftMonth(anchor, -1) : addDays(anchor, -step) })}>
+                <Link
+                  href={href({
+                    date: view === "month" ? shiftMonth(anchor, -1) : addDays(anchor, -step),
+                  })}
+                >
                   <ChevronLeft aria-hidden="true" />
                 </Link>
               </Button>
               <h2 className="text-card-title min-w-44 text-center">{title}</h2>
               <Button asChild variant="ghost" size="icon" aria-label="Next">
-                <Link href={href({ date: view === "month" ? shiftMonth(anchor, 1) : addDays(anchor, step) })}>
+                <Link
+                  href={href({
+                    date: view === "month" ? shiftMonth(anchor, 1) : addDays(anchor, step),
+                  })}
+                >
                   <ChevronRight aria-hidden="true" />
                 </Link>
               </Button>
@@ -322,14 +335,24 @@ export default async function AppointmentsPage({ searchParams }: Props) {
               {doctors.length > 1 ? (
                 <label className="text-muted flex flex-col gap-1 text-xs">
                   Doctor
-                  <Select name="doctor" defaultValue={doctorFilter ?? ""} className="w-48">
-                    <option value="">All doctors</option>
-                    {doctors.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.display_name}
-                      </option>
-                    ))}
-                  </Select>
+                  <span className="relative block w-48">
+                    <Select
+                      name="doctor"
+                      defaultValue={doctorFilter ?? ""}
+                      className="w-full appearance-none pr-11"
+                    >
+                      <option value="">All doctors</option>
+                      {doctors.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.display_name}
+                        </option>
+                      ))}
+                    </Select>
+                    <ChevronDown
+                      aria-hidden="true"
+                      className="text-muted pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2"
+                    />
+                  </span>
                 </label>
               ) : null}
               <Button type="submit" variant="ghost">
@@ -340,86 +363,111 @@ export default async function AppointmentsPage({ searchParams }: Props) {
 
           {view === "month" ? (
             <div className="grid grid-cols-7 gap-2" aria-label="Appointments by month">
-              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => <p key={day} className="text-muted px-2 py-1 text-center text-xs font-semibold">{day}</p>)}
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+                <p key={day} className="text-muted px-2 py-1 text-center text-xs font-semibold">
+                  {day}
+                </p>
+              ))}
               {monthCells(anchor).map((day, index) => {
-                const count = day ? appointments.filter((appointment) => dateOf(appointment.starts_at, tz) === day).length : 0;
+                const count = day
+                  ? appointments.filter((appointment) => dateOf(appointment.starts_at, tz) === day)
+                      .length
+                  : 0;
                 return day ? (
-                  <Link key={day} href={href({ date: day, view: "day" })} className="border-line bg-surface hover:bg-canvas flex min-h-24 flex-col rounded-control border p-2">
-                    <span className={cn("text-sm font-semibold", day === today && "text-mint-ink")}>{Number(day.slice(8))}</span>
-                    <span className="text-muted mt-auto text-xs">{count} {count === 1 ? "appointment" : "appointments"}</span>
+                  <Link
+                    key={day}
+                    href={href({ date: day, view: "day" })}
+                    className="border-line bg-surface hover:bg-canvas rounded-control flex min-h-24 flex-col border p-2"
+                  >
+                    <span className={cn("text-sm font-semibold", day === today && "text-mint-ink")}>
+                      {Number(day.slice(8))}
+                    </span>
+                    <span className="text-muted mt-auto text-xs">
+                      {count} {count === 1 ? "appointment" : "appointments"}
+                    </span>
                   </Link>
-                ) : <span key={`empty-${index}`} aria-hidden="true" />;
+                ) : (
+                  <span key={`empty-${index}`} aria-hidden="true" />
+                );
               })}
             </div>
-          ) : <div className="overflow-x-auto">
-            <div className="flex" style={{ minWidth: days.length * 120 + 64 }}>
-              <div className="w-16 shrink-0" style={{ paddingTop: HEADER_PX }} aria-hidden="true">
-                {hours.map((h) => (
-                  <div
-                    key={h}
-                    className="text-muted pt-1 pr-3 text-right text-xs"
-                    style={{ height: HOUR_PX }}
-                  >
-                    {hourLabel(h)}
-                  </div>
-                ))}
-              </div>
-              <div className="flex min-w-0 flex-1">
-                {days.map((d) => {
-                  const closed = !branchWindows.some((w) => w.weekday === weekdayOf(d));
-                  return (
-                    <section
-                      key={d}
-                      aria-label={`${formatWeekday(d)} ${Number(d.slice(8))}`}
-                      className="border-subtle min-w-0 flex-1 border-l"
+          ) : (
+            <div className="overflow-x-auto">
+              <div className="flex" style={{ minWidth: days.length * 120 + 64 }}>
+                <div className="w-16 shrink-0" style={{ paddingTop: HEADER_PX }} aria-hidden="true">
+                  {hours.map((h) => (
+                    <div
+                      key={h}
+                      className="text-muted pt-1 pr-3 text-right text-xs"
+                      style={{ height: HOUR_PX }}
                     >
-                      <div
-                        className={cn(
-                          "flex items-center justify-center text-sm font-medium",
-                          d === today ? "text-ink" : "text-muted",
-                        )}
-                        style={{ height: HEADER_PX }}
+                      {hourLabel(h)}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex min-w-0 flex-1">
+                  {days.map((d) => {
+                    const closed = !branchWindows.some((w) => w.weekday === weekdayOf(d));
+                    return (
+                      <section
+                        key={d}
+                        aria-label={`${formatWeekday(d)} ${Number(d.slice(8))}`}
+                        className="border-subtle min-w-0 flex-1 border-l"
                       >
-                        <span
+                        <div
                           className={cn(
-                            "rounded-full px-3 py-1",
-                            d === today && "bg-mint text-mint-ink",
+                            "flex items-center justify-center text-sm font-medium",
+                            d === today ? "text-ink" : "text-muted",
                           )}
+                          style={{ height: HEADER_PX }}
                         >
-                          {formatWeekday(d)} {Number(d.slice(8))}
-                        </span>
-                      </div>
-                      <div
-                        className={cn("relative", closed && "bg-canvas")}
-                        style={{ height: hours.length * HOUR_PX }}
-                      >
-                        {hours.map((h) => (
-                          <div
-                            key={h}
-                            className="border-subtle border-t"
-                            style={{ height: HOUR_PX }}
-                          />
-                        ))}
-                        {closed ? (
-                          <span className="text-muted absolute inset-x-0 top-3 text-center text-xs">
-                            Closed
+                          <span
+                            className={cn(
+                              "rounded-full px-3 py-1",
+                              d === today && "bg-mint text-mint-ink",
+                            )}
+                          >
+                            {formatWeekday(d)} {Number(d.slice(8))}
                           </span>
-                        ) : null}
-                        {(blocksByDay.get(d) ?? []).map((block) => (
-                          <AppointmentBlock key={block.id} block={block} />
-                        ))}
-                      </div>
-                    </section>
-                  );
-                })}
+                        </div>
+                        <div
+                          className={cn("relative", closed && "bg-canvas")}
+                          style={{ height: hours.length * HOUR_PX }}
+                        >
+                          {hours.map((h) => (
+                            <div
+                              key={h}
+                              className="border-subtle border-t"
+                              style={{ height: HOUR_PX }}
+                            />
+                          ))}
+                          {closed ? (
+                            <span className="text-muted absolute inset-x-0 top-3 text-center text-xs">
+                              Closed
+                            </span>
+                          ) : null}
+                          {(blocksByDay.get(d) ?? []).map((block) => (
+                            <AppointmentBlock key={block.id} block={block} />
+                          ))}
+                        </div>
+                      </section>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>}
+          )}
         </Card>
 
-        <div className="flex flex-col gap-6">
-          <Card className="flex flex-col gap-4 p-6">
-            <CardTitle>Doctors</CardTitle>
+        <div className="flex min-h-0 flex-col gap-6">
+          <Card className="flex flex-col gap-4 p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle>Doctors</CardTitle>
+                <p className="text-muted mt-1 text-xs">Availability for this branch today</p>
+              </div>
+              <Chip tone="neutral">{doctors.length} active</Chip>
+            </div>
             {doctors.length === 0 ? (
               <p className="text-muted text-sm">
                 No doctors yet.{" "}
@@ -430,7 +478,7 @@ export default async function AppointmentsPage({ searchParams }: Props) {
                 ) : null}
               </p>
             ) : (
-              <ul className="flex flex-col gap-3">
+              <ul className="max-h-72 space-y-2 overflow-y-auto overscroll-contain pr-1">
                 {doctors.map((d) => {
                   const works = branch
                     ? doctorWorksOn(
@@ -442,21 +490,33 @@ export default async function AppointmentsPage({ searchParams }: Props) {
                       )
                     : false;
                   return (
-                    <li key={d.id} className="flex items-center gap-3">
-                      <span
-                        aria-hidden="true"
-                        className="bg-mint text-mint-ink flex size-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-                      >
-                        {initials(d.display_name)}
-                      </span>
-                      <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                        <span className="truncate font-medium">{d.display_name}</span>
-                        {d.specialty ? (
-                          <span className="text-muted truncate text-xs">{d.specialty}</span>
-                        ) : null}
-                      </span>
-                      <Chip tone={works ? "success" : "neutral"}>
-                        {works ? "Available" : "Off today"}
+                    <li
+                      key={d.id}
+                      className="bg-canvas rounded-control flex min-w-0 flex-col gap-2 p-3"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span
+                          aria-hidden="true"
+                          className="bg-mint text-mint-ink flex size-11 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                        >
+                          {initials(d.display_name)}
+                        </span>
+                        <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                          <span className="truncate font-medium">{d.display_name}</span>
+                          {d.specialty ? (
+                            <span className="text-muted truncate text-xs">{d.specialty}</span>
+                          ) : null}
+                        </span>
+                      </div>
+                      <Chip tone={works ? "success" : "neutral"} className="ml-14 w-fit px-2.5">
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "size-1.5 rounded-full",
+                            works ? "bg-mint-ink" : "bg-muted",
+                          )}
+                        />
+                        {works ? "Available today" : "Off today"}
                       </Chip>
                     </li>
                   );
@@ -466,40 +526,59 @@ export default async function AppointmentsPage({ searchParams }: Props) {
           </Card>
 
           {canBook ? (
-            <Card className="flex flex-col gap-4 p-6">
+            <Card className="flex flex-col gap-4 p-5 sm:p-6">
               <div className="flex items-center justify-between gap-3">
-                <CardTitle>Waitlist</CardTitle>
+                <div>
+                  <CardTitle>Waitlist</CardTitle>
+                  <p className="text-muted mt-1 text-xs">Patients looking for an earlier slot</p>
+                </div>
+                {waitlist.length > 0 ? <Chip tone="neutral">{waitlist.length}</Chip> : null}
                 <AddToWaitlistDialog doctors={doctorOptions} />
               </div>
               {waitlist.length === 0 ? (
                 <p className="text-muted text-sm">Nobody is waiting for an earlier slot.</p>
               ) : (
-                <ul className="divide-line flex flex-col divide-y">
+                <ul className="max-h-72 space-y-2 overflow-y-auto overscroll-contain pr-1">
                   {waitlist.map((w) => {
                     const name = waitNames.get(w.patient_id)?.name ?? "Patient";
+                    const preferredDays = w.preferred_weekdays
+                      .map((x) => WEEKDAY_NAMES[x]?.slice(0, 3))
+                      .filter(Boolean);
                     return (
-                      <li key={w.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
-                        <div className="flex items-start justify-between gap-2">
+                      <li
+                        key={w.id}
+                        className="bg-canvas rounded-control flex min-w-0 flex-col gap-3 p-3"
+                      >
+                        <div className="flex min-w-0 items-start gap-3">
+                          <span
+                            aria-hidden="true"
+                            className="bg-surface text-ink-2 flex size-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                          >
+                            {initials(name)}
+                          </span>
                           <div className="min-w-0">
                             <p className="truncate font-semibold">{name}</p>
-                            <p className="text-muted truncate text-xs">
-                              {[
-                                w.reason,
-                                w.doctor_id ? doctorName.get(w.doctor_id) : null,
-                                w.preferred_weekdays.length
-                                  ? w.preferred_weekdays
-                                      .map((x) => WEEKDAY_NAMES[x]?.slice(0, 3))
-                                      .join(", ")
-                                  : null,
-                              ]
+                            <p className="text-muted mt-0.5 truncate text-xs">
+                              {[w.reason, w.doctor_id ? doctorName.get(w.doctor_id) : null]
                                 .filter(Boolean)
-                                .join(" · ") || "Any time"}
+                                .join(" · ") || "Any appointment"}
                             </p>
                           </div>
-                          <WaitlistRemoveButton entryId={w.id} name={name} />
                         </div>
-                        <div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {preferredDays.length > 0 ? (
+                            preferredDays.map((day) => (
+                              <Chip key={day} tone="neutral" className="bg-surface">
+                                {day}
+                              </Chip>
+                            ))
+                          ) : (
+                            <span className="text-muted text-xs">Any day</span>
+                          )}
+                        </div>
+                        <div className="border-line flex items-center justify-between gap-2 border-t pt-2">
                           <OutreachChip ok={w.outreach_ok} />
+                          <WaitlistRemoveButton entryId={w.id} name={name} />
                         </div>
                       </li>
                     );
@@ -509,16 +588,19 @@ export default async function AppointmentsPage({ searchParams }: Props) {
             </Card>
           ) : null}
 
-          <Card className="flex flex-col gap-3 p-6">
-            <CardTitle>Legend</CardTitle>
-            <ul className="flex flex-col gap-2.5 text-sm">
+          <Card className="flex flex-col gap-4 p-5 sm:p-6">
+            <div>
+              <CardTitle>Appointment status</CardTitle>
+              <p className="text-muted mt-1 text-xs">Color key for the calendar</p>
+            </div>
+            <ul className="flex flex-col gap-2 text-sm">
               {LEGEND.map((l) => (
-                <li key={l.label} className="flex items-center gap-2.5">
+                <li key={l.label} className="flex min-h-9 items-center gap-3">
                   <span
                     aria-hidden="true"
-                    className={cn("size-3.5 rounded-[5px] border", l.className)}
+                    className={cn("size-4 shrink-0 rounded-[5px] border", l.className)}
                   />
-                  {l.label}
+                  <span className="text-ink-2">{l.label}</span>
                 </li>
               ))}
             </ul>

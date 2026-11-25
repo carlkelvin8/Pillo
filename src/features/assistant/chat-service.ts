@@ -3,14 +3,13 @@ import { z } from "zod";
 import { assistantSettingsSchema } from "@/features/assistant/settings";
 import { detectEmergency, EMERGENCY_REPLY } from "./agent/emergency";
 import { FALLBACK_REPLY, runAgent, type HistoryMessage, type ModelCall } from "./agent/run";
-import { DEMO_MODEL } from "./demo/run";
 import type { AgentStore, ClinicInfo } from "./agent/store";
 import { createSupabaseAgentStore } from "./agent/store-supabase";
 import { minutesOfDay, toMinutes, todayIn, weekdayOf } from "@/lib/datetime";
 
 export const MAX_MESSAGE_CHARS = 1000;
 export const MAX_PATIENT_MESSAGES_PER_CONVERSATION = 60;
-export const DEFAULT_MODEL = DEMO_MODEL;
+export const DEFAULT_MODEL = "gemini-3.8-flash";
 export const BUSY_REPLY =
   "Maraming salamat po sa pasensya. Marami kaming mensahe ngayon, kaya ipinasa ko na ito sa staff namin para masagot kayo nang maayos.";
 
@@ -30,7 +29,7 @@ export function cleanMessage(input: string): string | null {
 /* ------------------------------- model ----------------------------------- */
 
 export function chatConfigured(): { ok: true; model: string } | { ok: false; missing: string } {
-  return { ok: false, missing: "LOCAL_SYNTHETIC_DEMO_ONLY" };
+  return { ok: false, missing: "AI_PROVIDER_NOT_CONFIGURED" };
 }
 
 export function createModelCall(): ModelCall | null {

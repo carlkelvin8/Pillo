@@ -33,23 +33,25 @@ function check(error: { code?: string } | null, what: string): void {
 }
 
 export type InboxFilter = "all" | "needs";
+export const CONVERSATION_PAGE_SIZE = 20;
 
 export async function listConversations(
   clinicId: string,
   filter: InboxFilter,
-  limit = 40,
-): Promise<ConversationRow[]> {
+  page = 1,
+): Promise<{ rows: ConversationRow[]; total: number }> {
   const supabase = await createClient();
   let q = supabase
     .from("conversations")
-    .select(COLUMNS)
+    .select(COLUMNS, { count: "exact" })
     .eq("clinic_id", clinicId)
     .order("last_message_at", { ascending: false })
-    .limit(limit);
+    .order("id", { ascending: true });
   if (filter === "needs") q = q.eq("status", "needs_human");
-  const { data, error } = await q;
+  const from = (Math.max(1, page) - 1) * CONVERSATION_PAGE_SIZE;
+  const { data, count, error } = await q.range(from, from + CONVERSATION_PAGE_SIZE - 1);
   check(error, "conversations");
-  return z.array(conversationRow).parse(data ?? []);
+  return { rows: z.array(conversationRow).parse(data ?? []), total: count ?? 0 };
 }
 
 export async function needsHumanCount(clinicId: string): Promise<number> {
@@ -93,10 +95,14 @@ export async function conversationMessages(conversationId: string): Promise<Mess
     .from("messages")
     .select("id, role, handled_by, content, created_at")
     .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true })
-    .limit(200);
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(1000);
   check(error, "messages");
-  return z.array(messageRow).parse(data ?? []);
+  return z
+    .array(messageRow)
+    .parse(data ?? [])
+    .reverse();
 }
 
 /** Latest message text per conversation, for the list preview. */
@@ -129,50 +135,97 @@ const actionRow = z.object({
   created_at: z.string(),
 });
 export type ActionRow = z.infer<typeof actionRow>;
+export const ACTION_PAGE_SIZE = 20;
 
-export async function listActions(clinicId: string, limit = 50): Promise<ActionRow[]> {
+export async function listActions(
+  clinicId: string,
+  page = 1,
+): Promise<{ rows: ActionRow[]; total: number }> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const from = (Math.max(1, page) - 1) * ACTION_PAGE_SIZE;
+  const { data, count, error } = await supabase
     .from("agent_actions")
-    .select("id, conversation_id, kind, status, autonomy, outcome, created_at")
+    .select("id, conversation_id, kind, status, autonomy, outcome, created_at", { count: "exact" })
     .eq("clinic_id", clinicId)
     .neq("kind", "reply")
     .order("created_at", { ascending: false })
-    .limit(limit);
+    .range(from, from + ACTION_PAGE_SIZE - 1);
   check(error, "activity");
-  return z.array(actionRow).parse(data ?? []);
+  return { rows: z.array(actionRow).parse(data ?? []), total: count ?? 0 };
 }
 
-export type McpPaymentRequest = { id: string; invoiceId: string; invoiceNumber: number; dueCentavos: number; createdAt: string };
+export type McpPaymentRequest = {
+  id: string;
+  invoiceId: string;
+  invoiceNumber: number;
+  dueCentavos: number;
+  createdAt: string;
+};
 
 /** Payment proposals contain invoice identifiers only; patient names and contact data stay out of the activity log. */
 export async function listMcpPaymentRequests(clinicId: string): Promise<McpPaymentRequest[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("agent_actions")
+  const { data, error } = await supabase
+    .from("agent_actions")
     .select("id, payload, created_at")
-    .eq("clinic_id", clinicId).eq("kind", "mcp_request_payment").eq("status", "proposed")
-    .order("created_at", { ascending: true }).limit(50);
+    .eq("clinic_id", clinicId)
+    .eq("kind", "mcp_request_payment")
+    .eq("status", "proposed")
+    .order("created_at", { ascending: true })
+    .limit(50);
   check(error, "MCP payment requests");
-  const proposals = z.array(z.object({ id: z.string(), payload: z.record(z.string(), z.unknown()), created_at: z.string() })).parse(data ?? []);
-  const ids = proposals.map((p) => p.payload.invoice_id).filter((v): v is string => typeof v === "string");
+  const proposals = z
+    .array(
+      z.object({
+        id: z.string(),
+        payload: z.record(z.string(), z.unknown()),
+        created_at: z.string(),
+      }),
+    )
+    .parse(data ?? []);
+  const ids = proposals
+    .map((p) => p.payload.invoice_id)
+    .filter((v): v is string => typeof v === "string");
   if (ids.length === 0) return [];
-  const { data: invoices, error: invoiceError } = await supabase.from("invoices")
-    .select("id, invoice_number, total_centavos").eq("clinic_id", clinicId).in("id", ids);
+  const { data: invoices, error: invoiceError } = await supabase
+    .from("invoices")
+    .select("id, invoice_number, total_centavos")
+    .eq("clinic_id", clinicId)
+    .in("id", ids);
   check(invoiceError, "MCP request invoices");
-  const { data: payments, error: paymentError } = await supabase.from("payments")
-    .select("invoice_id, amount_centavos, status").eq("clinic_id", clinicId).in("invoice_id", ids).eq("status", "succeeded");
+  const { data: payments, error: paymentError } = await supabase
+    .from("payments")
+    .select("invoice_id, amount_centavos, status")
+    .eq("clinic_id", clinicId)
+    .in("invoice_id", ids)
+    .eq("status", "succeeded");
   check(paymentError, "MCP request payments");
   const paidByInvoice = new Map<string, number>();
   for (const payment of payments ?? []) {
     const invoiceId = String(payment.invoice_id);
-    paidByInvoice.set(invoiceId, (paidByInvoice.get(invoiceId) ?? 0) + Number(payment.amount_centavos));
+    paidByInvoice.set(
+      invoiceId,
+      (paidByInvoice.get(invoiceId) ?? 0) + Number(payment.amount_centavos),
+    );
   }
   const byId = new Map((invoices ?? []).map((invoice) => [String(invoice.id), invoice]));
   return proposals.flatMap((p) => {
     const invoiceId = p.payload.invoice_id;
     const invoice = typeof invoiceId === "string" ? byId.get(invoiceId) : undefined;
-    const dueCentavos = invoice ? Number(invoice.total_centavos) - (paidByInvoice.get(String(invoice.id)) ?? 0) : 0;
-    return invoice && dueCentavos > 0 ? [{ id: p.id, invoiceId: String(invoice.id), invoiceNumber: Number(invoice.invoice_number), dueCentavos, createdAt: p.created_at }] : [];
+    const dueCentavos = invoice
+      ? Number(invoice.total_centavos) - (paidByInvoice.get(String(invoice.id)) ?? 0)
+      : 0;
+    return invoice && dueCentavos > 0
+      ? [
+          {
+            id: p.id,
+            invoiceId: String(invoice.id),
+            invoiceNumber: Number(invoice.invoice_number),
+            dueCentavos,
+            createdAt: p.created_at,
+          },
+        ]
+      : [];
   });
 }
 
@@ -207,8 +260,21 @@ export async function getRules(
   const { data, error } = await supabase
     .from("agent_rules")
     .select("kind, autonomy, daily_limit")
-    .eq("clinic_id", clinicId);
+    .eq("clinic_id", clinicId)
+    .in("kind", ["reply", "book_appointment"]);
   check(error, "rules");
+  // Other agent features (for example chair-filler) share this table but have
+  // their own settings UI. Ignore their rows before validating this editor's shape.
+  const supportedKinds = new Set(["reply", "book_appointment"]);
+  const supportedData = Array.isArray(data)
+    ? data.filter(
+        (row) =>
+          typeof row === "object" &&
+          row !== null &&
+          "kind" in row &&
+          supportedKinds.has(String(row.kind)),
+      )
+    : data;
   const rows = z
     .array(
       z.object({
@@ -217,7 +283,7 @@ export async function getRules(
         daily_limit: z.number(),
       }),
     )
-    .parse(data ?? []);
+    .parse(supportedData ?? []);
   const find = (k: RuleRow["kind"], dflt: number): RuleRow =>
     rows.find((r) => r.kind === k) ?? { kind: k, autonomy: "auto", daily_limit: dflt };
   return { reply: find("reply", 300), book_appointment: find("book_appointment", 30) };

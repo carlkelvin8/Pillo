@@ -191,14 +191,27 @@ export default async function InvoicesPage({ searchParams }: Props) {
             </tbody>
           </Table>
         )}
-        {pages > 1 ? (
-          <nav aria-label="Pagination" className="flex items-center justify-between px-2 pb-2">
+        <nav
+          aria-label="Invoice pagination"
+          className="flex flex-wrap items-center justify-between gap-3 px-2 pb-2"
+        >
+          <span className="tabular text-muted text-sm">
+            Showing {total === 0 ? 0 : (page - 1) * INVOICE_PAGE_SIZE + 1}–
+            {Math.min(page * INVOICE_PAGE_SIZE, total)} of {total} · {INVOICE_PAGE_SIZE} per page
+          </span>
+          <div className="flex items-center gap-2">
             <Button
               asChild
               variant="ghost"
               className={page <= 1 ? "pointer-events-none opacity-50" : undefined}
             >
-              <Link href={href(filter, Math.max(1, page - 1))}>Previous</Link>
+              <Link
+                href={href(filter, Math.max(1, page - 1))}
+                aria-disabled={page <= 1}
+                tabIndex={page <= 1 ? -1 : undefined}
+              >
+                Previous
+              </Link>
             </Button>
             <span className="tabular text-muted text-sm">
               Page {page} of {pages}
@@ -208,10 +221,16 @@ export default async function InvoicesPage({ searchParams }: Props) {
               variant="ghost"
               className={page >= pages ? "pointer-events-none opacity-50" : undefined}
             >
-              <Link href={href(filter, page + 1)}>Next</Link>
+              <Link
+                href={href(filter, page + 1)}
+                aria-disabled={page >= pages}
+                tabIndex={page >= pages ? -1 : undefined}
+              >
+                Next
+              </Link>
             </Button>
-          </nav>
-        ) : null}
+          </div>
+        </nav>
       </Card>
     </>
   );

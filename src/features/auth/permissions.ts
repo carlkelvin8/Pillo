@@ -27,7 +27,7 @@ export const CAPABILITY_LABELS: Record<Capability, string> = {
   "patients.records": "Patient records",
   "patients.directory": "Patient directory",
   "invoices.create": "Create invoices",
-  "payments.manage": "Payments and payouts",
+  "payments.manage": "Payments",
   "staff.manage": "Manage staff",
   "inbox.view": "Dr. Pill inbox",
   "integrations.manage": "Integrations and MCP",

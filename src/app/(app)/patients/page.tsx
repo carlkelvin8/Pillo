@@ -149,19 +149,30 @@ export default async function PatientsPage({ searchParams }: Props) {
                 return (
                   <tr key={p.id} className="hover:bg-canvas">
                     <Td>
-                      <Link href={`/patients/${p.id}`} className="flex min-h-11 items-center gap-3">
+                      <Link
+                        href={`/patients/${p.id}`}
+                        aria-label={`Open record for ${p.full_name}`}
+                        className="flex min-h-11 items-center gap-3 text-left"
+                      >
                         <span
                           aria-hidden="true"
                           className="bg-mint text-mint-ink flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
                         >
                           {initials(p.full_name)}
                         </span>
-                        <span className="flex flex-col">
+                        <span className="flex min-w-0 flex-col">
                           <span className="font-semibold">{p.full_name}</span>
                           <span className="text-muted text-xs">
-                            {[meta, `ID ${patientIdLabel(p.patient_number)}`]
+                            {[
+                              p.birthdate ? `DOB ${formatDateShort(p.birthdate)}` : null,
+                              meta,
+                              `ID ${patientIdLabel(p.patient_number)}`,
+                            ]
                               .filter(Boolean)
                               .join(" · ")}
+                          </span>
+                          <span className="text-muted max-w-full truncate text-xs">
+                            {[p.phone, p.email].filter(Boolean).join(" · ") || "No contact details"}
                           </span>
                         </span>
                       </Link>
@@ -179,8 +190,15 @@ export default async function PatientsPage({ searchParams }: Props) {
           </Table>
         )}
 
-        {pages > 1 ? (
-          <nav aria-label="Pagination" className="flex items-center justify-between px-2 pb-2">
+        <nav
+          aria-label="Patient pagination"
+          className="flex flex-wrap items-center justify-between gap-3 px-2 pb-2"
+        >
+          <span className="tabular text-muted text-sm">
+            Showing {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–
+            {Math.min(page * PAGE_SIZE, total)} of {total} · {PAGE_SIZE} per page
+          </span>
+          <div className="flex items-center gap-2">
             <Button
               asChild
               variant="ghost"
@@ -189,6 +207,7 @@ export default async function PatientsPage({ searchParams }: Props) {
               <Link
                 href={href({ page: page > 2 ? String(page - 1) : undefined })}
                 aria-disabled={page <= 1}
+                tabIndex={page <= 1 ? -1 : undefined}
               >
                 Previous
               </Link>
@@ -201,12 +220,16 @@ export default async function PatientsPage({ searchParams }: Props) {
               variant="ghost"
               className={page >= pages ? "pointer-events-none opacity-50" : undefined}
             >
-              <Link href={href({ page: String(page + 1) })} aria-disabled={page >= pages}>
+              <Link
+                href={href({ page: String(page + 1) })}
+                aria-disabled={page >= pages}
+                tabIndex={page >= pages ? -1 : undefined}
+              >
                 Next
               </Link>
             </Button>
-          </nav>
-        ) : null}
+          </div>
+        </nav>
       </Card>
     </>
   );

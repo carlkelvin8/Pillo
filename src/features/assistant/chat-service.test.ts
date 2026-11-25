@@ -59,7 +59,7 @@ describe("live AI configuration", () => {
     process.env.GEMINI_API_KEY = "test-gemini-key";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
     try {
-      expect(chatConfigured()).toEqual({ ok: false, missing: "LOCAL_SYNTHETIC_DEMO_ONLY" });
+      expect(chatConfigured()).toEqual({ ok: false, missing: "AI_PROVIDER_NOT_CONFIGURED" });
       expect(createModelCall()).toBeNull();
     } finally {
       if (previousGemini === undefined) delete process.env.GEMINI_API_KEY;

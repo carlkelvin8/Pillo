@@ -9,6 +9,14 @@ import { can } from "@/features/auth/permissions";
 import { getWorkspace } from "@/features/auth/workspace";
 import { echo, formString, validationFailed, type ActionState } from "@/lib/action-state";
 import { createClient } from "@/lib/supabase/server";
+import {
+  CONVERSATION_PAGE_SIZE,
+  lastMessages,
+  listConversations,
+  type InboxFilter,
+} from "@/features/assistant/queries";
+import { patientNames } from "@/features/patients/queries";
+import { dateOf, formatDateShort, formatTime, todayIn } from "@/lib/datetime";
 
 const DENIED: ActionState = { message: "You do not have permission to do that." };
 
@@ -16,6 +24,47 @@ async function inboxCtx() {
   const ws = await getWorkspace();
   if (!ws?.membership || !can(ws.membership.role, "inbox.view")) return null;
   return { clinic: ws.membership.clinic };
+}
+
+/** Fetches one more inbox batch for the scrollable Dr. Pill conversation list. */
+export async function loadMoreConversationsAction(page: number, filter: InboxFilter) {
+  const context = await inboxCtx();
+  if (!context) return { items: [], total: 0, hasMore: false };
+  if (!Number.isInteger(page) || page < 2 || page > 100_000 || !["all", "needs"].includes(filter))
+    return { items: [], total: 0, hasMore: false };
+
+  const { clinic } = context;
+  const [{ rows, total }] = await Promise.all([listConversations(clinic.id, filter, page)]);
+  const [previews, names] = await Promise.all([
+    lastMessages(rows.map((conversation) => conversation.id)),
+    patientNames(
+      clinic.id,
+      rows.map((conversation) => conversation.patient_id).filter((id): id is string => Boolean(id)),
+    ),
+  ]);
+  const today = todayIn(clinic.timezone);
+  const items = rows.map((conversation) => {
+    const patientName = conversation.patient_id
+      ? names.get(conversation.patient_id)?.name
+      : undefined;
+    const date = dateOf(conversation.last_message_at, clinic.timezone);
+    return {
+      id: conversation.id,
+      status: conversation.status,
+      handledBy: conversation.handled_by,
+      label:
+        patientName ??
+        (conversation.patient_id
+          ? "Patient"
+          : `Web visitor · ${date === today ? formatTime(conversation.created_at, clinic.timezone) : formatDateShort(date)}`),
+      time:
+        date === today
+          ? formatTime(conversation.last_message_at, clinic.timezone)
+          : formatDateShort(date),
+      preview: previews.get(conversation.id) ?? "No messages",
+    };
+  });
+  return { items, total, hasMore: page * CONVERSATION_PAGE_SIZE < total };
 }
 
 const idSchema = z.uuid();
@@ -95,7 +144,10 @@ export const handBackAction = async (_p: ActionState, f: FormData) =>
 export const resolveConversationAction = async (_p: ActionState, f: FormData) =>
   setConversation(f, { status: "resolved" }, "conversation.resolved");
 
-async function decideMcpPayment(formData: FormData, decision: "approved" | "rejected"): Promise<ActionState> {
+async function decideMcpPayment(
+  formData: FormData,
+  decision: "approved" | "rejected",
+): Promise<ActionState> {
   const ws = await getWorkspace();
   const m = ws?.membership;
   if (!m || !can(m.role, "inbox.view") || !can(m.role, "invoices.create")) return DENIED;
@@ -113,16 +165,29 @@ async function decideMcpPayment(formData: FormData, decision: "approved" | "reje
       p_action_id: id.data,
       p_approved: false,
     });
-    if (error || decided !== true) return { message: "Another staff member already decided this request." };
+    if (error || decided !== true)
+      return { message: "Another staff member already decided this request." };
   }
-  await logAudit(supabase, m.clinic.id, `mcp.payment_request_${decision}`, "mcp_payment_request", id.data);
+  await logAudit(
+    supabase,
+    m.clinic.id,
+    `mcp.payment_request_${decision}`,
+    "mcp_payment_request",
+    id.data,
+  );
   revalidatePath("/dr-pill/activity");
   revalidatePath("/invoices");
-  return { ok: true, message: decision === "approved" ? "Payment link created and request approved." : "Request rejected." };
+  return {
+    ok: true,
+    message:
+      decision === "approved" ? "Payment link created and request approved." : "Request rejected.",
+  };
 }
 
-export const approveMcpPaymentRequestAction = async (_p: ActionState, f: FormData) => decideMcpPayment(f, "approved");
-export const rejectMcpPaymentRequestAction = async (_p: ActionState, f: FormData) => decideMcpPayment(f, "rejected");
+export const approveMcpPaymentRequestAction = async (_p: ActionState, f: FormData) =>
+  decideMcpPayment(f, "approved");
+export const rejectMcpPaymentRequestAction = async (_p: ActionState, f: FormData) =>
+  decideMcpPayment(f, "rejected");
 
 /** Dr. Pill's abilities and tone (same switches as onboarding), without the onboarding redirect. */
 export async function updateAssistantSettingsAction(

@@ -38,7 +38,7 @@ export default async function DrPillSettingsPage() {
   const offerLimit =
     typeof cfRule?.daily_limit === "number" ? cfRule.daily_limit : DEFAULT_OFFER_LIMIT;
   const config = chatConfigured();
-  const link = slug ? `${publicEnv().NEXT_PUBLIC_SITE_URL}/chat/${slug}` : null;
+  const link = config.ok && slug ? `${publicEnv().NEXT_PUBLIC_SITE_URL}/chat/${slug}` : null;
 
   return (
     <>
@@ -48,10 +48,8 @@ export default async function DrPillSettingsPage() {
         <div className="flex items-center gap-4">
           <DrPillAvatar mood="happy" size={64} decorative />
           <div>
-            <CardTitle>Chat link</CardTitle>
-            <p className="text-muted">
-              Share this on your Facebook page, Google profile, website or at the front desk.
-            </p>
+            <CardTitle>Patient chat</CardTitle>
+            <p className="text-muted">A public chat link is available when patient messaging is enabled.</p>
           </div>
         </div>
         {link ? <CopyLink url={link} /> : null}
@@ -60,9 +58,8 @@ export default async function DrPillSettingsPage() {
             role="status"
             className="rounded-control bg-amber-chip text-amber-chip-ink p-4 text-sm"
           >
-            Live clinic chat is paused while we validate Dr. Pill with the local synthetic Gemini
-            demo. The public chat link stays unavailable and does not send clinic or patient data to
-            an AI provider.
+            Patient chat is currently unavailable. The public link will appear here when live
+            messaging is enabled for your clinic.
           </p>
         ) : (
           <p className="text-muted text-sm">Chat is on. Model: {config.model}.</p>
