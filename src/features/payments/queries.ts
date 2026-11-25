@@ -34,7 +34,7 @@ export type Transaction = {
   invoiceId?: string;
 };
 
-export const TRANSACTION_PAGE_SIZE = 20;
+export const TRANSACTION_PAGE_SIZE = 10;
 export type TransactionFilter = "all" | "pending";
 
 const METHOD_LABEL = {

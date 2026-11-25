@@ -6,20 +6,21 @@ import { assistantSettingsSchema } from "@/features/assistant/settings";
 import { logAudit } from "@/features/audit/log";
 import { can } from "@/features/auth/permissions";
 import { getWorkspace } from "@/features/auth/workspace";
-import { clinicDetailsSchema } from "@/features/clinic/schemas";
+import { clinicDetailsSchema, clinicProfileSchema } from "@/features/clinic/schemas";
 import { echo, formString, validationFailed, type ActionState } from "@/lib/action-state";
 import { createClient } from "@/lib/supabase/server";
 
 const DETAIL_KEYS = ["name", "address", "phone", "email"] as const;
+const PROFILE_KEYS = [...DETAIL_KEYS, "websiteUrl"] as const;
 const DENIED: ActionState = { message: "You do not have permission to do that." };
 
 function detailsFromForm(formData: FormData) {
-  return clinicDetailsSchema.safeParse({
+  return {
     name: formString(formData, "name"),
     address: formString(formData, "address"),
     phone: formString(formData, "phone"),
     email: formString(formData, "email"),
-  });
+  };
 }
 
 /** Onboarding step 1. Idempotent: a user who already has a clinic just moves on. */
@@ -31,7 +32,7 @@ export async function createClinicAction(
   if (!ws) redirect("/login");
   if (ws.membership) redirect("/onboarding?step=2");
 
-  const parsed = detailsFromForm(formData);
+  const parsed = clinicDetailsSchema.safeParse(detailsFromForm(formData));
   if (!parsed.success) return validationFailed(parsed.error, formData, DETAIL_KEYS);
 
   const supabase = await createClient();
@@ -57,8 +58,11 @@ export async function updateClinicAction(
   const ws = await getWorkspace();
   if (!ws?.membership || !can(ws.membership.role, "staff.manage")) return DENIED;
 
-  const parsed = detailsFromForm(formData);
-  if (!parsed.success) return validationFailed(parsed.error, formData, DETAIL_KEYS);
+  const parsed = clinicProfileSchema.safeParse({
+    ...detailsFromForm(formData),
+    websiteUrl: formData.has("websiteUrl") ? formString(formData, "websiteUrl") : undefined,
+  });
+  if (!parsed.success) return validationFailed(parsed.error, formData, PROFILE_KEYS);
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -68,10 +72,13 @@ export async function updateClinicAction(
       address: parsed.data.address ?? null,
       phone: parsed.data.phone ?? null,
       email: parsed.data.email ?? null,
+      ...(parsed.data.websiteUrl !== undefined ? { website_url: parsed.data.websiteUrl } : {}),
     })
     .eq("id", ws.membership.clinic.id)
     .select("id");
-  if (error || !data?.length) return { message: "We could not save your changes." };
+  if (error || !data?.length) {
+    return { message: "We could not save your changes.", values: echo(formData, PROFILE_KEYS) };
+  }
 
   await logAudit(
     supabase,

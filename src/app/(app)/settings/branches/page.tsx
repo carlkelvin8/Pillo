@@ -42,9 +42,7 @@ export default async function BranchesSettingsPage() {
           <section key={b.id} aria-label={b.name} className="grid gap-6 lg:grid-cols-2">
             <Card className="flex flex-col gap-5">
               <CardTitle>{b.name}</CardTitle>
-              <BranchDetailsForm
-                branch={{ id: b.id, name: b.name, address: b.address, phone: b.phone }}
-              />
+              <BranchDetailsForm branch={b} />
             </Card>
             <Card className="flex flex-col gap-5">
               <CardTitle>Opening hours</CardTitle>

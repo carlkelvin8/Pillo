@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { clinicWebsiteSchema } from "@/features/clinic/schemas";
 import { loadSlotContext } from "@/features/scheduling/queries";
 import { isOpenSlot } from "@/features/scheduling/slots";
 import { dateOf, formatDateLong, formatTime } from "@/lib/datetime";
@@ -23,16 +24,29 @@ const rowSchema = z.object({
 });
 type OfferRecord = z.infer<typeof rowSchema>;
 
+const branchLocationSchema = z.object({
+  name: z.string(),
+  address: z.string().nullable(),
+  latitude: z.number().min(-90).max(90).nullable(),
+  longitude: z.number().min(-180).max(180).nullable(),
+});
+
+export type OfferLocation = {
+  branch: z.infer<typeof branchLocationSchema> | null;
+  websiteUrl: string | null;
+};
+
 export type OfferView =
   | { state: "invalid" }
-  | { state: Exclude<OfferState, "open">; clinicName: string }
-  | {
+  | { state: Exclude<OfferState, "open" | "accepted">; clinicName: string }
+  | ({ state: "accepted"; clinicName: string } & OfferLocation)
+  | ({
       state: "open";
       clinicName: string;
       doctorName: string;
       slotLabel: string;
       patientFirstName: string;
-    };
+    } & OfferLocation);
 
 export type AcceptResult = "accepted" | "taken" | "closed";
 
@@ -54,13 +68,36 @@ async function find(svc: SupabaseClient, token: string): Promise<OfferRecord | n
 }
 
 async function clinicOf(svc: SupabaseClient, clinicId: string) {
-  const { data } = await svc
+  let { data, error } = await svc
     .from("clinics")
-    .select("name, timezone")
+    .select("name, timezone, website_url")
     .eq("id", clinicId)
     .maybeSingle();
+  // Offers remain usable while the optional website_url migration is pending.
+  if (error?.code === "42703") {
+    ({ data, error } = await svc
+      .from("clinics")
+      .select("name, timezone")
+      .eq("id", clinicId)
+      .maybeSingle());
+  }
+  if (error) return { name: "the clinic", timezone: "Asia/Manila", websiteUrl: null };
   const c = z.object({ name: z.string(), timezone: z.string() }).safeParse(data);
-  return c.success ? c.data : { name: "the clinic", timezone: "Asia/Manila" };
+  return {
+    name: c.data?.name ?? "the clinic",
+    timezone: c.data?.timezone ?? "Asia/Manila",
+    websiteUrl: clinicWebsiteSchema.safeParse(data?.website_url).data ?? null,
+  };
+}
+
+async function branchOf(svc: SupabaseClient, offer: OfferRecord) {
+  const { data } = await svc
+    .from("branches")
+    .select("name, address, latitude, longitude")
+    .eq("clinic_id", offer.clinic_id)
+    .eq("id", offer.branch_id)
+    .maybeSingle();
+  return branchLocationSchema.safeParse(data).data ?? null;
 }
 
 export async function viewOffer(
@@ -70,9 +107,14 @@ export async function viewOffer(
 ): Promise<OfferView> {
   const o = await find(svc, token);
   if (!o) return { state: "invalid" };
-  const clinic = await clinicOf(svc, o.clinic_id);
   const state = offerState(o, now);
-  if (state !== "open") return { state, clinicName: clinic.name };
+  const [clinic, branch] = await Promise.all([
+    clinicOf(svc, o.clinic_id),
+    state === "open" || state === "accepted" ? branchOf(svc, o) : null,
+  ]);
+  if (state === "closed" || state === "expired") return { state, clinicName: clinic.name };
+  const location: OfferLocation = { branch, websiteUrl: clinic.websiteUrl };
+  if (state === "accepted") return { state, clinicName: clinic.name, ...location };
   const [{ data: d }, { data: p }] = await Promise.all([
     svc
       .from("doctors")
@@ -90,6 +132,7 @@ export async function viewOffer(
   return {
     state: "open",
     clinicName: clinic.name,
+    ...location,
     doctorName:
       z.object({ display_name: z.string() }).safeParse(d).data?.display_name ?? "the doctor",
     patientFirstName: firstName(

@@ -108,6 +108,39 @@ describe("tenant isolation", () => {
 });
 
 describe("clinics", () => {
+  it("lets only the clinic's owner update its public website", async () => {
+    const website = "https://www.facebook.com/sampleclinic";
+    for (const user of [u.recepA, u.ownerB]) {
+      await asUser(user, async (tx) => {
+        expect(
+          await tx`update public.clinics set website_url = ${website}
+          where id = ${clinicA} returning website_url`,
+        ).toHaveLength(0);
+      });
+    }
+    await asUser(u.ownerA, async (tx) => {
+      expect(
+        await tx`update public.clinics set website_url = ${website}
+        where id = ${clinicA} returning website_url`,
+      ).toEqual([{ website_url: website }]);
+      expect(
+        await tx`update public.clinics set website_url = null
+        where id = ${clinicA} returning website_url`,
+      ).toEqual([{ website_url: null }]);
+    });
+    const err = await failure(null, (tx) => tx`select website_url from public.clinics`);
+    expect(err.code).toBe("42501");
+  });
+
+  it("rejects non-web public links even when sent directly to the database", async () => {
+    const error = await failure(
+      u.ownerA,
+      (tx) => tx`
+      update public.clinics set website_url = 'javascript:alert(1)' where id = ${clinicA}`,
+    );
+    expect(error.code).toBe("23514");
+  });
+
   it("cannot be inserted or deleted directly", async () => {
     const ins = await failure(
       u.stranger,

@@ -22,6 +22,36 @@ export const clinicDetailsSchema = z.object({
 });
 export type ClinicDetails = z.infer<typeof clinicDetailsSchema>;
 
+const websiteError = "Enter a website URL beginning with https:// or http://.";
+export const clinicWebsiteSchema = z
+  .string()
+  .trim()
+  .max(2048)
+  .regex(/^https?:\/\/[^\s\\]+$/i, websiteError)
+  .pipe(z.url({ protocol: /^https?$/, error: websiteError }))
+  .refine((value) => {
+    const url = new URL(value);
+    return !url.username && !url.password;
+  }, "Remove credentials from the website URL.");
+
+export const clinicProfileSchema = clinicDetailsSchema.extend({
+  websiteUrl: z
+    .union(
+      [
+        z
+          .string()
+          .trim()
+          .length(0)
+          .transform(() => null),
+        clinicWebsiteSchema,
+      ],
+      {
+        error: websiteError,
+      },
+    )
+    .optional(),
+});
+
 /** A clinic row as returned by PostgREST. */
 export const clinicRowSchema = z.object({
   id: z.uuid(),

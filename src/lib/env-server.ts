@@ -9,6 +9,8 @@ const serverEnvSchema = z.object({
   PAYMENTS_MODE: z.enum(["mock", "paymongo"]).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
   GEMINI_MODEL: z.string().min(1).optional(),
+  /** Live patient chat and owner questions. Off unless exactly "true". Keep off until the clinic-data privacy decision is made (CLAUDE.md). */
+  LIVE_AI_ENABLED: z.boolean().optional(),
   DATABASE_URL: z.url().optional(),
 });
 
@@ -22,6 +24,7 @@ export function serverEnv(): ServerEnv {
     PAYMENTS_MODE: process.env.PAYMENTS_MODE || undefined,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY || undefined,
     GEMINI_MODEL: process.env.GEMINI_MODEL || undefined,
+    LIVE_AI_ENABLED: process.env.LIVE_AI_ENABLED === "true",
     DATABASE_URL: process.env.DATABASE_URL || undefined,
   });
   return parsed.success ? parsed.data : {};

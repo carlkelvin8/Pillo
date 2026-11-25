@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { ChevronRight, Search } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -105,16 +105,21 @@ export default async function PatientsPage({ searchParams }: Props) {
               </Link>
             ))}
           </nav>
-          <form action="/patients" method="get" className="flex items-center gap-2" role="search">
+          <form
+            action="/patients"
+            method="get"
+            className="flex min-w-0 items-center gap-2 max-sm:w-full"
+            role="search"
+          >
             {filter === "new" ? <input type="hidden" name="filter" value="new" /> : null}
-            <label className="rounded-control border-line-strong bg-surface flex min-h-11 items-center gap-2 border px-3">
-              <Search className="text-muted size-4" aria-hidden="true" />
+            <label className="rounded-control border-line-strong bg-surface flex min-h-11 min-w-0 items-center gap-2 border px-3 max-sm:flex-1">
+              <Search className="text-muted size-4 shrink-0" aria-hidden="true" />
               <span className="sr-only">Search patients</span>
               <input
                 name="q"
                 defaultValue={q}
                 placeholder="Name or phone"
-                className="placeholder:text-muted w-44 bg-transparent text-sm outline-none"
+                className="placeholder:text-muted w-full min-w-0 bg-transparent text-sm outline-none sm:w-44"
               />
             </label>
             <Button type="submit" variant="ghost">
@@ -135,8 +140,11 @@ export default async function PatientsPage({ searchParams }: Props) {
             <thead>
               <tr>
                 <Th>Patient</Th>
-                <Th>Last visit</Th>
-                <Th>Next</Th>
+                <Th className="hidden sm:table-cell">Last visit</Th>
+                <Th className="hidden sm:table-cell">Next visit</Th>
+                <Th className="w-px text-right">
+                  <span className="sr-only">Patient record</span>
+                </Th>
               </tr>
             </thead>
             <tbody>
@@ -148,9 +156,10 @@ export default async function PatientsPage({ searchParams }: Props) {
                   .join(" · ");
                 return (
                   <tr key={p.id} className="hover:bg-canvas">
-                    <Td>
+                    <Td className="px-2 sm:px-4">
                       <Link
                         href={`/patients/${p.id}`}
+                        prefetch={false}
                         aria-label={`Open record for ${p.full_name}`}
                         className="flex min-h-11 items-center gap-3 text-left"
                       >
@@ -161,7 +170,7 @@ export default async function PatientsPage({ searchParams }: Props) {
                           {initials(p.full_name)}
                         </span>
                         <span className="flex min-w-0 flex-col">
-                          <span className="font-semibold">{p.full_name}</span>
+                          <span className="font-semibold wrap-anywhere">{p.full_name}</span>
                           <span className="text-muted text-xs">
                             {[
                               p.birthdate ? `DOB ${formatDateShort(p.birthdate)}` : null,
@@ -177,11 +186,23 @@ export default async function PatientsPage({ searchParams }: Props) {
                         </span>
                       </Link>
                     </Td>
-                    <Td className="tabular text-ink-2">
+                    <Td className="tabular text-ink-2 hidden sm:table-cell">
                       {s?.last ? formatDateShort(dateOf(s.last, tz)) : "—"}
                     </Td>
-                    <Td className="tabular text-ink-2">
+                    <Td className="tabular text-ink-2 hidden sm:table-cell">
                       {s?.next ? formatDateShort(dateOf(s.next, tz)) : "—"}
+                    </Td>
+                    <Td className="px-2 text-right sm:px-4">
+                      <Button asChild variant="ghost" className="px-3">
+                        <Link
+                          href={`/patients/${p.id}`}
+                          prefetch={false}
+                          aria-label={`View patient ${p.full_name}`}
+                        >
+                          View
+                          <ChevronRight aria-hidden="true" />
+                        </Link>
+                      </Button>
                     </Td>
                   </tr>
                 );

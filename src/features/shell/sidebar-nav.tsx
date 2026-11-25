@@ -4,10 +4,10 @@ import type { NavGroup } from "./nav-config";
 /** Grouped primary navigation (Workspace, Money, Assistant). */
 export function SidebarNav({ groups }: { groups: NavGroup[] }) {
   return (
-    <nav aria-label="Primary" className="flex flex-col gap-8">
+    <nav aria-label="Primary" className="sidebar-nav flex flex-col gap-8">
       {groups.map((group) => (
-        <div key={group.label} className="flex flex-col gap-2">
-          <p className="text-muted px-4 pb-1 text-xs font-semibold tracking-wide uppercase">
+        <div key={group.label} className="sidebar-nav-group flex flex-col gap-2">
+          <p className="sidebar-group-label text-muted px-4 pb-1 text-xs font-semibold tracking-wide uppercase">
             {group.label}
           </p>
           <ul className="flex flex-col gap-1.5">
@@ -15,12 +15,14 @@ export function SidebarNav({ groups }: { groups: NavGroup[] }) {
               <li key={href}>
                 <NavLink
                   href={href}
+                  aria-label={label}
+                  title={label}
                   matchPrefix={matchPrefix}
-                  className="rounded-control text-ink-2 hover:bg-subtle flex min-h-12 items-center gap-3.5 px-3.5 text-sm font-medium transition-colors duration-150"
+                  className="sidebar-nav-link rounded-control text-ink-2 hover:bg-subtle flex min-h-12 items-center gap-3.5 px-3.5 text-sm font-medium transition-colors duration-150"
                   activeClassName="bg-ink text-surface hover:bg-ink"
                 >
-                  <Icon className="size-5 shrink-0" aria-hidden="true" />
-                  {label}
+                  <Icon className="sidebar-nav-icon size-5 shrink-0" aria-hidden="true" />
+                  <span className="sidebar-nav-label">{label}</span>
                 </NavLink>
               </li>
             ))}

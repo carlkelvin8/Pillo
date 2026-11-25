@@ -6,6 +6,8 @@ import { FALLBACK_REPLY, runAgent, type HistoryMessage, type ModelCall } from ".
 import type { AgentStore, ClinicInfo } from "./agent/store";
 import { createSupabaseAgentStore } from "./agent/store-supabase";
 import { minutesOfDay, toMinutes, todayIn, weekdayOf } from "@/lib/datetime";
+import { serverEnv } from "@/lib/env-server";
+import { createGeminiModelCall } from "./agent/gemini";
 
 export const MAX_MESSAGE_CHARS = 1000;
 export const MAX_PATIENT_MESSAGES_PER_CONVERSATION = 60;
@@ -28,12 +30,26 @@ export function cleanMessage(input: string): string | null {
 
 /* ------------------------------- model ----------------------------------- */
 
+/**
+ * Live AI (patient chat and owner questions) is paused: Gemini Free must not receive live clinic
+ * or patient data (CLAUDE.md). It stays off unless LIVE_AI_ENABLED=true is set on purpose.
+ */
+export function liveAiEnabled(): boolean {
+  return serverEnv().LIVE_AI_ENABLED === true;
+}
+
 export function chatConfigured(): { ok: true; model: string } | { ok: false; missing: string } {
-  return { ok: false, missing: "AI_PROVIDER_NOT_CONFIGURED" };
+  const env = serverEnv();
+  if (!liveAiEnabled()) return { ok: false, missing: "LIVE_AI_ENABLED" };
+  return env.GEMINI_API_KEY
+    ? { ok: true, model: env.GEMINI_MODEL ?? DEFAULT_MODEL }
+    : { ok: false, missing: "GEMINI_API_KEY" };
 }
 
 export function createModelCall(): ModelCall | null {
-  return null;
+  if (!liveAiEnabled()) return null;
+  const apiKey = serverEnv().GEMINI_API_KEY;
+  return apiKey ? createGeminiModelCall({ apiKey }) : null;
 }
 
 /* ------------------------------ data access ------------------------------ */

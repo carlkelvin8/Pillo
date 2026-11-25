@@ -1,41 +1,67 @@
-import { minutesOfDay } from "@/lib/datetime";
+import { dateOf, minutesOfDay, toMinutes } from "@/lib/datetime";
 
-export const HOUR_PX = 64;
+const BOOKED_HOUR_PX = 64;
+const EMPTY_HOUR_PX = 40;
+const BLOCK_MIN_PX = 24;
+const BLOCK_INSET_PX = 2;
 export const HEADER_PX = 44;
 
-export type GridRange = { startHour: number; endHour: number };
+type AppointmentTimes = { startsAt: string; endsAt: string };
+type CalendarRow = { hour: number; top: number; height: number };
+type CalendarGrid = { startHour: number; rows: CalendarRow[]; height: number };
 
-/** Visible hour range: covers branch hours and any appointment, never narrower than 8 AM to 6 PM (the design shows a 5 PM row). */
-export function gridRange(
-  openWindows: { start: string; end: string }[],
-  appointments: { startsAt: string; endsAt: string }[],
-  tz: string,
-): GridRange {
-  let start = 8 * 60;
-  let end = 18 * 60;
-  const [firstOpen] = openWindows;
-  if (firstOpen) {
-    start = Math.min(...openWindows.map((w) => hm(w.start)));
-    end = Math.max(...openWindows.map((w) => hm(w.end)));
-    start = Math.min(start, 8 * 60);
-    end = Math.max(end, 18 * 60);
-  }
-  for (const a of appointments) {
-    start = Math.min(start, minutesOfDay(a.startsAt, tz));
-    end = Math.max(end, minutesOfDay(a.endsAt, tz));
-  }
-  return { startHour: Math.floor(start / 60), endHour: Math.ceil(end / 60) };
+function appointmentMinutes({ startsAt, endsAt }: AppointmentTimes, tz: string) {
+  const start = minutesOfDay(startsAt, tz);
+  // Appointments are rendered in their starting-day column.
+  const end = dateOf(startsAt, tz) === dateOf(endsAt, tz) ? minutesOfDay(endsAt, tz) : 24 * 60;
+  return { start, end: Math.max(end, start + 1) };
 }
 
-const hm = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+/** Build a shared time axis covering the displayed opening hours and appointments. */
+export function calendarGrid(
+  openWindows: { start: string; end: string }[],
+  appointments: AppointmentTimes[],
+  tz: string,
+): CalendarGrid {
+  const bookings = appointments.map((appointment) => appointmentMinutes(appointment, tz));
+  const ranges = [
+    ...openWindows.map(({ start, end }) => ({ start: toMinutes(start), end: toMinutes(end) })),
+    ...bookings,
+  ];
+  const startHour = ranges.length ? Math.floor(Math.min(...ranges.map((r) => r.start)) / 60) : 8;
+  const endHour = ranges.length ? Math.ceil(Math.max(...ranges.map((r) => r.end)) / 60) : 18;
+  const rows: CalendarRow[] = [];
+  let height = 0;
+  for (let hour = startHour; hour < endHour; hour++) {
+    const booked = bookings.some(({ start, end }) => start < (hour + 1) * 60 && end > hour * 60);
+    const rowHeight = booked ? BOOKED_HOUR_PX : EMPTY_HOUR_PX;
+    rows.push({ hour, top: height, height: rowHeight });
+    height += rowHeight;
+  }
+  // Leave space for a short appointment at the bottom without shifting its start time.
+  const grid = { startHour, rows, height };
+  for (const { start } of bookings) {
+    grid.height = Math.max(
+      grid.height,
+      minutePosition(start, grid) + BLOCK_MIN_PX + BLOCK_INSET_PX * 2,
+    );
+  }
+  return grid;
+}
+
+function minutePosition(minutes: number, grid: CalendarGrid) {
+  const row = grid.rows[Math.floor(minutes / 60) - grid.startHour];
+  if (row) return row.top + ((minutes % 60) / 60) * row.height;
+  const lastRow = grid.rows.at(-1);
+  return lastRow ? lastRow.top + lastRow.height : 0;
+}
 
 /** Absolute position of an appointment block inside a day column. */
-export function blockPosition(startsAt: string, endsAt: string, tz: string, startHour: number) {
-  const startMin = minutesOfDay(startsAt, tz);
-  let endMin = minutesOfDay(endsAt, tz);
-  if (endMin <= startMin) endMin = startMin + 30; // crosses midnight or zero length: clamp
-  const top = ((startMin - startHour * 60) / 60) * HOUR_PX + 2;
-  const height = Math.max(((endMin - startMin) / 60) * HOUR_PX - 4, 24);
+export function blockPosition(appointment: AppointmentTimes, tz: string, grid: CalendarGrid) {
+  const { start, end } = appointmentMinutes(appointment, tz);
+  const startPx = minutePosition(start, grid);
+  const top = startPx + BLOCK_INSET_PX;
+  const height = Math.max(minutePosition(end, grid) - startPx - BLOCK_INSET_PX * 2, BLOCK_MIN_PX);
   return { top, height };
 }
 

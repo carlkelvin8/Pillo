@@ -13,10 +13,18 @@ import {
   saveHoursAction,
   updateBranchAction,
 } from "@/features/branches/actions";
+import { BranchLocationField } from "@/features/branches/components/branch-location-field";
 import { WEEKDAYS } from "@/features/branches/schemas";
 import type { ActionState } from "@/lib/action-state";
 
-type BranchFields = { id?: string; name: string; address: string | null; phone: string | null };
+type BranchFields = {
+  id: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  latitude: number | null;
+  longitude: number | null;
+};
 
 export function BranchDetailsForm({
   branch,
@@ -47,6 +55,11 @@ export function BranchDetailsForm({
       <Field label="Phone" error={state.fieldErrors?.phone?.[0]}>
         <Input name="phone" type="tel" maxLength={40} defaultValue={v("phone", branch?.phone)} />
       </Field>
+      <BranchLocationField
+        latitude={branch?.latitude ?? null}
+        longitude={branch?.longitude ?? null}
+        errors={state.fieldErrors}
+      />
       <div>
         <SubmitButton pendingLabel="Saving…">
           {branch?.id ? "Save branch" : "Add branch"}

@@ -28,11 +28,24 @@ export const metadata: Metadata = { title: "Dashboard" };
 
 const greeting = (hour: number) =>
   hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-function Tile({ label, value, hint }: { label: string; value: string; hint: string }) {
+function Tile({
+  label,
+  value,
+  hint,
+  quantityType,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  quantityType?: string;
+}) {
   return (
-    <Card className="flex flex-col gap-1 p-6">
+    <Card className="flex min-h-40 flex-col justify-center gap-2.5 p-7">
       <span className="text-muted text-sm">{label}</span>
-      <span className="tabular text-2xl font-semibold tracking-tight">{value}</span>
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <span className="tabular text-3xl font-semibold tracking-tight">{value}</span>
+        {quantityType ? <span className="text-muted text-sm">{quantityType}</span> : null}
+      </div>
       <span className="text-muted text-sm">{hint}</span>
     </Card>
   );
@@ -101,7 +114,6 @@ export default async function DashboardPage() {
     (a) => a.ends_at > nowIso && (a.status === "scheduled" || a.status === "confirmed"),
   );
   const monthTotals = months.map((m) => collections?.byMonth.get(m) ?? 0);
-  const yearTotal = monthTotals.reduce((a, b) => a + b, 0);
   const canOpenPatients = can(role, "patients.directory");
   const analyticsLayout = dashboardAnalyticsLayout();
 
@@ -112,9 +124,7 @@ export default async function DashboardPage() {
       {showMoney ? (
         <div className={`grid items-stretch gap-6 ${analyticsLayout.columns}`}>
           <BalanceHero centavos={balance} />
-          {collections ? (
-            <CollectionsBarChart months={months} values={monthTotals} total={yearTotal} />
-          ) : null}
+          {collections ? <CollectionsBarChart months={months} values={monthTotals} /> : null}
         </div>
       ) : null}
 
@@ -125,7 +135,7 @@ export default async function DashboardPage() {
         />
       ) : null}
 
-      <div className="grid items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid items-stretch gap-6 sm:grid-cols-2 2xl:grid-cols-5">
         {collectedToday ? (
           <Tile
             label="Collected today"
@@ -160,6 +170,7 @@ export default async function DashboardPage() {
             label="Appointments"
             value={String(todays.filter((a) => a.status !== "cancelled").length)}
             hint={`${remaining.length} remaining today`}
+            quantityType="appointments"
           />
         ) : null}
         {patients ? (
@@ -167,6 +178,7 @@ export default async function DashboardPage() {
             label="Registered patients"
             value={patients.total.toLocaleString("en-PH")}
             hint={`${patients.newThisMonth.toLocaleString("en-PH")} added this month`}
+            quantityType="patients"
           />
         ) : null}
       </div>

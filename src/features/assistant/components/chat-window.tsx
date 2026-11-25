@@ -96,7 +96,11 @@ export function ChatWindow({
 
   function toggleReadAloud(id: string, text: string) {
     if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
-      setVoiceNotice({ id, message: "Read aloud is not available in this browser. The message is still available as text." });
+      setVoiceNotice({
+        id,
+        message:
+          "Read aloud is not available in this browser. The message is still available as text.",
+      });
       return;
     }
 
@@ -109,7 +113,11 @@ export function ChatWindow({
 
     const voice = findLocalSpeechVoice(window.speechSynthesis.getVoices());
     if (!voice) {
-      setVoiceNotice({ id, message: "No local voice is available on this device. The message is still available as text." });
+      setVoiceNotice({
+        id,
+        message:
+          "No local voice is available on this device. The message is still available as text.",
+      });
       return;
     }
 
@@ -118,6 +126,8 @@ export function ChatWindow({
     setVoiceNotice(null);
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.voice = voice;
+    utterance.pitch = 1.18;
+    utterance.rate = 0.94;
     utterance.onend = () => {
       if (speechRunId.current === runId) setVoiceMessageId(null);
     };
@@ -125,7 +135,10 @@ export function ChatWindow({
       if (speechRunId.current !== runId) return;
       setVoiceMessageId(null);
       if (event.error !== "canceled" && event.error !== "interrupted") {
-        setVoiceNotice({ id, message: "Read aloud could not play. The message is still available as text." });
+        setVoiceNotice({
+          id,
+          message: "Read aloud could not play. The message is still available as text.",
+        });
       }
     };
     setVoiceMessageId(id);
@@ -185,7 +198,7 @@ export function ChatWindow({
   const greeting = `Hi po! Ako si ${ASSISTANT_NAME}, ang virtual receptionist ng ${clinicName}. Paano po kita matutulungan?${open ? "" : " Sarado na po kami ngayon, pero pwede pa rin po akong tumulong mag-book."}`;
 
   return (
-    <div className="bg-surface sm:rounded-card sm:border-line sm:shadow-card mx-auto flex h-dvh max-w-xl flex-col sm:my-6 sm:h-[calc(100dvh-3rem)] sm:border">
+    <div className="bg-surface sm:rounded-card sm:border-line sm:shadow-card mx-auto flex h-dvh w-full max-w-6xl flex-col sm:my-6 sm:h-[calc(100dvh-3rem)] sm:border">
       <header className="border-line flex items-center gap-3 border-b px-5 py-4">
         <DrPillAvatar mood={mood} size={44} decorative />
         <div className="min-w-0 flex-1">
@@ -321,7 +334,11 @@ function Bubble({
           >
             {playing ? <Square aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
           </Button>
-          {notice ? <p role="status" className="text-muted max-w-64 text-xs">{notice}</p> : null}
+          {notice ? (
+            <p role="status" className="text-muted max-w-64 text-xs">
+              {notice}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </div>

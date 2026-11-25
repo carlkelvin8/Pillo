@@ -22,6 +22,9 @@ const offer = (over = {}) => ({
 type Call = { table: string; op: string; payload?: unknown };
 type Script = {
   offer?: unknown;
+  branch?: unknown;
+  websiteUrl?: string;
+  websiteColumnMissing?: boolean;
   claim?: boolean;
   busy?: unknown[];
   hours?: unknown[];
@@ -32,15 +35,28 @@ function fake(s: Script) {
   const from = (table: string) => {
     let op = "select";
     let payload: unknown;
+    let selection: unknown;
     const q: Record<string, unknown> = {};
     for (const m of ["select", "eq", "in", "lt", "gt", "order", "limit"]) q[m] = () => q;
+    q.select = (columns: unknown) => ((selection = columns), q);
     q.update = (p: unknown) => ((op = "update"), (payload = p), q);
     q.insert = (p: unknown) => ((op = "insert"), (payload = p), q);
     const done = () => {
       calls.push({ table, op, payload });
       if (op === "select" && table === "slot_offers") return { data: s.offer ?? null, error: null };
+      if (
+        op === "select" &&
+        table === "clinics" &&
+        s.websiteColumnMissing &&
+        String(selection).includes("website_url")
+      )
+        return { data: null, error: { code: "42703" } };
       if (op === "select" && table === "clinics")
-        return { data: { name: "Sample", timezone: "Asia/Manila" }, error: null };
+        return {
+          data: { name: "Sample", timezone: "Asia/Manila", website_url: s.websiteUrl ?? null },
+          error: null,
+        };
+      if (op === "select" && table === "branches") return { data: s.branch ?? null, error: null };
       if (op === "select" && table === "clinic_hours")
         return {
           data: s.hours ?? [{ weekday: 4, opens_at: "09:00", closes_at: "17:00" }],
@@ -135,6 +151,27 @@ describe("viewOffer / declineOffer", () => {
   });
   it("reports invalid for unknown tokens", async () => {
     expect((await viewOffer(fake({ offer: null }).svc, TOKEN, NOW)).state).toBe("invalid");
+  });
+  it("shows the approved offer's public branch location and clinic website", async () => {
+    const branch = { name: "Main branch", address: "Main Street", latitude: 14.5, longitude: 121 };
+    const websiteUrl = "https://www.facebook.com/sampleclinic";
+    for (const status of ["sent", "accepted"]) {
+      const f = fake({ offer: offer({ status }), branch, websiteUrl });
+      expect(await viewOffer(f.svc, TOKEN, NOW)).toMatchObject({ branch, websiteUrl });
+    }
+  });
+
+  it("omits an unsafe website URL from the patient view", async () => {
+    const f = fake({ offer: offer(), websiteUrl: "javascript:alert(1)" });
+    expect(await viewOffer(f.svc, TOKEN, NOW)).toMatchObject({ websiteUrl: null });
+  });
+  it("keeps an offer readable when the optional clinic website column is not migrated", async () => {
+    const f = fake({ offer: offer(), websiteColumnMissing: true });
+    expect(await viewOffer(f.svc, TOKEN, NOW)).toMatchObject({
+      state: "open",
+      clinicName: "Sample",
+      websiteUrl: null,
+    });
   });
   it("declines only an open offer", async () => {
     const f = fake({ offer: offer() });

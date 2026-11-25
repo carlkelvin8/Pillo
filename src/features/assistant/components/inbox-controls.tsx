@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { FormMessage } from "@/components/ui/form-message";
 import { SubmitButton } from "@/components/ui/submit-button";
 import {
@@ -10,6 +10,7 @@ import {
   sendStaffMessageAction,
 } from "@/features/assistant/actions";
 import type { ActionState } from "@/lib/action-state";
+import { MessageThread } from "./message-thread";
 
 /** Refreshes the server-rendered inbox every few seconds while the tab is visible. */
 export function AutoRefresh({ everyMs = 5000 }: { everyMs?: number }) {
@@ -23,34 +24,77 @@ export function AutoRefresh({ everyMs = 5000 }: { everyMs?: number }) {
   return null;
 }
 
-export function ReplyForm({ conversationId }: { conversationId: string }) {
-  const [state, action] = useActionState<ActionState, FormData>(sendStaffMessageAction, {});
+export function ReplyThread({
+  conversationId,
+  messageCount,
+  canReply,
+  children,
+}: {
+  conversationId: string;
+  messageCount: number;
+  canReply: boolean;
+  children: ReactNode;
+}) {
+  const [state, action, pending] = useActionState<ActionState, FormData>(
+    sendStaffMessageAction,
+    {},
+  );
+  const [submittedText, setSubmittedText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
+  const pendingReply = pending ? submittedText : "";
   useEffect(() => {
     if (state.ok && ref.current) ref.current.value = "";
   }, [state]);
   return (
-    <form action={action} className="border-line flex flex-col gap-2 border-t pt-4">
-      <FormMessage state={state} />
-      <input type="hidden" name="conversationId" value={conversationId} />
-      <label className="sr-only" htmlFor="staff-reply">
-        Reply to the patient
-      </label>
-      <textarea
-        id="staff-reply"
-        ref={ref}
-        name="message"
-        rows={2}
-        maxLength={1000}
-        required
-        defaultValue={state.values?.message}
-        placeholder="Type a reply. The patient sees it in their chat."
-        className="rounded-control border-line-strong bg-surface placeholder:text-muted min-h-11 w-full border px-4 py-2.5 text-sm"
-      />
-      <div className="flex justify-end">
-        <SubmitButton pendingLabel="Sending…">Send reply</SubmitButton>
-      </div>
-    </form>
+    <>
+      <MessageThread messageCount={messageCount + Number(Boolean(pendingReply))}>
+        <ol aria-label="Messages" className="flex flex-col gap-4">
+          {children}
+          {pendingReply ? (
+            <li className="flex flex-col items-end gap-1">
+              <span className="text-muted text-xs" role="status">
+                Staff · Sending…
+              </span>
+              <p className="rounded-card shadow-card bg-ink text-surface max-w-[min(88%,44rem)] px-4 py-3 text-sm leading-6 whitespace-pre-line">
+                {pendingReply}
+              </p>
+            </li>
+          ) : null}
+        </ol>
+      </MessageThread>
+      {canReply ? (
+        <form
+          action={action}
+          onSubmit={() => setSubmittedText(ref.current?.value.trim() ?? "")}
+          className="border-line flex flex-col gap-2 border-t pt-4"
+        >
+          <FormMessage state={state} />
+          <input type="hidden" name="conversationId" value={conversationId} />
+          <label className="sr-only" htmlFor="staff-reply">
+            Reply to the patient
+          </label>
+          <textarea
+            id="staff-reply"
+            ref={ref}
+            name="message"
+            rows={2}
+            maxLength={1000}
+            required
+            readOnly={pending}
+            defaultValue={state.values?.message}
+            placeholder="Type a reply. The patient sees it in their chat."
+            className="rounded-control border-line-strong bg-surface placeholder:text-muted min-h-11 w-full border px-4 py-2.5 text-sm"
+          />
+          <div className="flex justify-end">
+            <SubmitButton pendingLabel="Sending…">Send reply</SubmitButton>
+          </div>
+        </form>
+      ) : (
+        <p className="text-muted text-sm">
+          Resolved. If the patient writes again, Dr. Pill picks the chat back up.
+        </p>
+      )}
+    </>
   );
 }
 

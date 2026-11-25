@@ -114,7 +114,7 @@ export function CancelLinkButton({
     <form action={action}>
       <input type="hidden" name="paymentId" value={paymentId} />
       <input type="hidden" name="invoiceId" value={invoiceId} />
-      <SubmitButton variant="ghost" pendingLabel="Cancelling…">
+      <SubmitButton variant="ghost" pendingLabel="Cancelling…" className="w-full">
         Cancel link
       </SubmitButton>
       {state.message && !state.ok ? <FormMessage state={state} /> : null}
@@ -184,7 +184,11 @@ export function RecordPaymentDialog({
     <FormDialog
       title="Record a payment"
       description="For cash or bank transfers received outside the payment link."
-      trigger={<Button variant="ghost">Record cash or bank payment</Button>}
+      trigger={
+        <Button variant="ghost" className="py-2 whitespace-normal">
+          Record cash or bank payment
+        </Button>
+      }
     >
       {(close) => <RecordForm invoiceId={invoiceId} dueLabel={dueLabel} onDone={close} />}
     </FormDialog>

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
-import { Card, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
 import { Table, Td, Th } from "@/components/ui/table";
 import { requireCapability } from "@/features/auth/workspace";
@@ -73,8 +74,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   timeline.sort((a, b) => a.at.localeCompare(b.at));
 
   return (
-    <>
-      <div className="flex flex-col gap-4">
+    <div className="@container flex flex-col gap-8">
+      <header className="flex flex-col gap-4">
         <Link
           href="/invoices"
           className="text-muted hover:text-ink inline-flex min-h-11 w-fit items-center gap-2 text-sm font-medium"
@@ -82,49 +83,57 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           <ArrowLeft className="size-4" aria-hidden="true" /> Invoices
         </Link>
         <div className="flex flex-wrap items-center gap-4">
-          <h1 className="tabular text-title">{invoiceLabel(invoice.invoice_number)}</h1>
+          <h1 className="tabular text-title min-w-0 wrap-anywhere">
+            {invoiceLabel(invoice.invoice_number)}
+          </h1>
           <Chip tone={STATUS_TONE[status]}>{STATUS_LABEL[status]}</Chip>
         </div>
-      </div>
-      {invoice.status === "draft" ? (
-        <DraftInvoiceEditor
-          invoiceId={invoice.id}
-          dueOn={invoice.due_on}
-          patient={patient ? { id: invoice.patient_id, ...patient } : null}
-          items={items}
-        />
-      ) : null}
+      </header>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[1.7fr_1fr]">
-        <Card className="flex flex-col gap-6">
+      <div className="grid items-start gap-6 @min-[48rem]:grid-cols-[minmax(0,1fr)_minmax(18rem,34%)]">
+        <Card
+          aria-labelledby="invoice-details"
+          className="@container flex min-w-0 flex-col gap-6 p-4 sm:p-6"
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle>Invoice details</CardTitle>
-            <a
-              href={`/api/invoices/${invoice.id}/pdf`}
-              className="text-ink inline-flex min-h-11 items-center font-medium underline underline-offset-4"
-            >
-              Download PDF
-            </a>
+            <h2 id="invoice-details" className="text-card-title">
+              Invoice details
+            </h2>
+            <Button asChild variant="ghost">
+              <a href={`/api/invoices/${invoice.id}/pdf`}>
+                <Download aria-hidden="true" /> Download PDF
+              </a>
+            </Button>
           </div>
-          <div className="flex flex-wrap justify-between gap-4">
-            <div>
-              <p className="font-semibold">{clinic.name}</p>
-              {clinic.address ? <p className="text-muted text-sm">{clinic.address}</p> : null}
+          <div className="border-line grid gap-4 border-y py-4 text-sm @min-[27rem]:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="flex min-w-0 flex-wrap gap-x-8 gap-y-4 wrap-anywhere">
+              <div className="min-w-0 flex-1 basis-36">
+                <p className="font-semibold">{clinic.name}</p>
+                {clinic.address ? <p className="text-muted mt-1">{clinic.address}</p> : null}
+              </div>
+              <div className="min-w-0 flex-1 basis-36">
+                <p className="text-muted">Billed to</p>
+                <p className="font-semibold">{patient?.name ?? "Patient"}</p>
+                {patient ? (
+                  <p className="text-muted mt-1">Patient ID {patientIdLabel(patient.number)}</p>
+                ) : null}
+              </div>
             </div>
-            <dl className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
+            <dl className="grid grid-cols-[auto_1fr] content-start gap-x-5 gap-y-1">
               <dt className="text-muted">Issued</dt>
               <dd className="tabular font-medium">{formatDateShort(invoice.issued_on)}</dd>
               <dt className="text-muted">Due</dt>
               <dd className="tabular font-medium">{formatDateShort(invoice.due_on)}</dd>
             </dl>
           </div>
-          <div>
-            <p className="text-muted text-sm">Billed to</p>
-            <p className="font-semibold">{patient?.name ?? "Patient"}</p>
-            {patient ? (
-              <p className="text-muted text-sm">Patient ID {patientIdLabel(patient.number)}</p>
-            ) : null}
-          </div>
+          {invoice.status === "draft" ? (
+            <DraftInvoiceEditor
+              invoiceId={invoice.id}
+              dueOn={invoice.due_on}
+              patient={patient ? { id: invoice.patient_id, ...patient } : null}
+              items={items}
+            />
+          ) : null}
           <Table>
             <caption className="sr-only">Invoice items</caption>
             <thead>
@@ -138,15 +147,19 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             <tbody>
               {items.map((i) => (
                 <tr key={i.id}>
-                  <Td>{i.description}</Td>
+                  <Td className="min-w-24 wrap-anywhere">{i.description}</Td>
                   <Td className="tabular text-right">{i.quantity}</Td>
-                  <Td className="tabular text-right">{formatPHP(i.unit_price_centavos)}</Td>
-                  <Td className="tabular text-right font-medium">{formatPHP(i.amount_centavos)}</Td>
+                  <Td className="tabular text-right whitespace-nowrap">
+                    {formatPHP(i.unit_price_centavos)}
+                  </Td>
+                  <Td className="tabular text-right font-medium whitespace-nowrap">
+                    {formatPHP(i.amount_centavos)}
+                  </Td>
                 </tr>
               ))}
             </tbody>
           </Table>
-          <dl className="ml-auto flex w-full max-w-xs flex-col gap-2 text-sm">
+          <dl className="ml-auto flex w-full max-w-xs flex-col gap-2 text-sm [&_dd]:text-right [&>div]:gap-3">
             <div className="flex justify-between">
               <dt className="text-muted">Subtotal</dt>
               <dd className="tabular">{formatPHP(invoice.subtotal_centavos)}</dd>
@@ -181,59 +194,63 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             </div>
           </dl>
           {invoice.note ? (
-            <p className="rounded-control bg-canvas text-ink-2 p-4 text-sm">{invoice.note}</p>
+            <p className="rounded-control bg-canvas text-ink-2 p-4 text-sm wrap-anywhere">
+              {invoice.note}
+            </p>
           ) : null}
         </Card>
 
-        <div className="flex flex-col gap-6">
-          <Card className="flex flex-col gap-4">
-            <CardTitle>Payment</CardTitle>
+        <div className="flex min-w-0 flex-col gap-6">
+          <Card aria-labelledby="invoice-payment" className="flex flex-col gap-4 p-4 sm:p-6">
+            <h2 id="invoice-payment" className="text-card-title">
+              Payment
+            </h2>
             {paid > 0 ? (
               <section aria-label="Payment receipt" className="rounded-control bg-mint p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
                     <p className="text-mint-ink text-sm font-semibold">Total received</p>
-                    <p className="tabular mt-1 text-2xl font-semibold tracking-tight">
+                    <p className="tabular mt-1 text-2xl font-semibold tracking-tight wrap-anywhere">
                       {formatPHP(paid)}
                     </p>
                   </div>
-                  {invoice.status === "paid" ? <Chip tone="success">Paid in full</Chip> : null}
+                  {invoice.status === "paid" ? (
+                    <Chip tone="success" className="bg-surface">
+                      Paid in full
+                    </Chip>
+                  ) : null}
                 </div>
-                <dl className="text-mint-ink border-mint-ink/15 mt-4 flex flex-col gap-2 border-t pt-3 text-sm">
-                  {latestPayment ? (
-                    <div className="text-mint-ink/75 pb-1 text-xs font-semibold tracking-wide uppercase">
-                      Latest payment
-                    </div>
-                  ) : null}
-                  {latestPayment ? (
-                    <div className="flex justify-between gap-3">
+                {latestPayment ? (
+                  <div className="text-mint-ink border-mint-ink/15 mt-4 border-t pt-3 text-sm">
+                    <p className="mb-2 text-xs font-semibold">Latest payment</p>
+                    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 [&_dd]:text-right [&_dd]:font-medium [&_dd]:wrap-anywhere">
                       <dt>Amount</dt>
-                      <dd className="tabular font-medium">
-                        {formatPHP(latestPayment.amount_centavos)}
-                      </dd>
-                    </div>
-                  ) : null}
-                  {latestPayment?.method ? (
-                    <div className="flex justify-between gap-3">
-                      <dt>Method</dt>
-                      <dd className="font-medium">{METHOD_LABEL[latestPayment.method]}</dd>
-                    </div>
-                  ) : null}
-                  {latestPayment?.paid_at ? (
-                    <div className="flex justify-between gap-3">
-                      <dt>Received</dt>
-                      <dd className="tabular font-medium">{when(latestPayment.paid_at)}</dd>
-                    </div>
-                  ) : null}
-                  {latestPayment?.reference || latestPayment?.provider_ref ? (
-                    <div className="flex justify-between gap-3">
-                      <dt>Reference</dt>
-                      <dd className="max-w-40 truncate font-medium">
-                        {latestPayment.reference ?? latestPayment.provider_ref}
-                      </dd>
-                    </div>
-                  ) : null}
-                </dl>
+                      <dd className="tabular">{formatPHP(latestPayment.amount_centavos)}</dd>
+                      {latestPayment.method ? (
+                        <>
+                          <dt>Method</dt>
+                          <dd>{METHOD_LABEL[latestPayment.method]}</dd>
+                        </>
+                      ) : null}
+                      {latestPayment.paid_at ? (
+                        <>
+                          <dt>Received</dt>
+                          <dd className="tabular">
+                            <time dateTime={latestPayment.paid_at}>
+                              {when(latestPayment.paid_at)}
+                            </time>
+                          </dd>
+                        </>
+                      ) : null}
+                      {latestPayment.reference || latestPayment.provider_ref ? (
+                        <>
+                          <dt>Reference</dt>
+                          <dd>{latestPayment.reference ?? latestPayment.provider_ref}</dd>
+                        </>
+                      ) : null}
+                    </dl>
+                  </div>
+                ) : null}
               </section>
             ) : null}
             {invoice.status === "void" ? (
@@ -268,18 +285,22 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             {canCollect && paid === 0 ? <VoidInvoiceButton invoiceId={invoice.id} /> : null}
           </Card>
 
-          <Card className="flex flex-col gap-4">
-            <CardTitle>Timeline</CardTitle>
-            <ol className="flex flex-col gap-4">
+          <Card aria-labelledby="invoice-timeline" className="flex flex-col gap-4 p-4 sm:p-6">
+            <h2 id="invoice-timeline" className="text-card-title">
+              Timeline
+            </h2>
+            <ol className="divide-line divide-y">
               {timeline.map((t, i) => (
-                <li key={`${t.at}-${i}`} className="flex gap-3">
+                <li key={`${t.at}-${i}`} className="flex gap-3 py-3 first:pt-0 last:pb-0">
                   <span
                     aria-hidden="true"
                     className="bg-mint-strong mt-1.5 size-2.5 shrink-0 rounded-full"
                   />
-                  <div>
+                  <div className="min-w-0 wrap-anywhere">
                     <p className="text-sm font-medium">{t.label}</p>
-                    <p className="tabular text-muted text-xs">{when(t.at)}</p>
+                    <time dateTime={t.at} className="tabular text-muted mt-1 block text-xs">
+                      {when(t.at)}
+                    </time>
                   </div>
                 </li>
               ))}
@@ -287,6 +308,6 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           </Card>
         </div>
       </div>
-    </>
+    </div>
   );
 }

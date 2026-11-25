@@ -90,29 +90,26 @@ export async function sendStaffMessageAction(
     });
   if (!parsed.success) return validationFailed(parsed.error, formData, ["message"]);
 
+  const { conversationId, message } = parsed.data;
   const supabase = await createClient();
   // Row Level Security only allows role 'staff' / handled_by 'human' messages into this clinic's conversations.
   const { error } = await supabase.from("messages").insert({
     clinic_id: c.clinic.id,
-    conversation_id: parsed.data.conversationId,
+    conversation_id: conversationId,
     role: "staff",
     handled_by: "human",
-    content: parsed.data.message,
+    content: message,
   });
   if (error)
     return { message: "We could not send that reply.", values: echo(formData, ["message"]) };
-  await supabase
-    .from("conversations")
-    .update({ handled_by: "human", status: "open" })
-    .eq("id", parsed.data.conversationId)
-    .eq("clinic_id", c.clinic.id);
-  await logAudit(
-    supabase,
-    c.clinic.id,
-    "conversation.replied",
-    "conversation",
-    parsed.data.conversationId,
-  );
+  await Promise.all([
+    supabase
+      .from("conversations")
+      .update({ handled_by: "human", status: "open" })
+      .eq("id", conversationId)
+      .eq("clinic_id", c.clinic.id),
+    logAudit(supabase, c.clinic.id, "conversation.replied", "conversation", conversationId),
+  ]);
   revalidatePath("/dr-pill");
   return { ok: true };
 }

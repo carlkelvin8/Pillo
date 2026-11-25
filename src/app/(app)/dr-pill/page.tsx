@@ -10,9 +10,8 @@ import { requireCapability } from "@/features/auth/workspace";
 import {
   AutoRefresh,
   ConversationControls,
-  ReplyForm,
+  ReplyThread,
 } from "@/features/assistant/components/inbox-controls";
-import { MessageThread } from "@/features/assistant/components/message-thread";
 import {
   conversationMessages,
   getConversation,
@@ -51,17 +50,19 @@ export default async function InboxPage({ searchParams }: Props) {
   const filter: InboxFilter = params.filter === "needs" ? "needs" : "all";
   const selectedId = params.c && /^[0-9a-f-]{36}$/i.test(params.c) ? params.c : undefined;
 
-  const [{ rows: list, total }, needs] = await Promise.all([
+  const [{ rows: list, total }, needs, selected] = await Promise.all([
     listConversations(clinic.id, filter, 1),
     needsHumanCount(clinic.id),
+    selectedId ? getConversation(clinic.id, selectedId) : null,
   ]);
-  const previews = await lastMessages(list.map((c) => c.id));
-  const selected = selectedId ? await getConversation(clinic.id, selectedId) : null;
-  const messages = selected ? await conversationMessages(selected.id) : [];
   const linked = [...list, ...(selected ? [selected] : [])]
     .map((c) => c.patient_id)
     .filter((x): x is string => Boolean(x));
-  const names = await patientNames(clinic.id, linked);
+  const [previews, messages, names] = await Promise.all([
+    lastMessages(list.map((c) => c.id)),
+    selected ? conversationMessages(selected.id) : [],
+    patientNames(clinic.id, linked),
+  ]);
 
   const when = (iso: string) =>
     dateOf(iso, tz) === today ? formatTime(iso, tz) : formatDateShort(dateOf(iso, tz));
@@ -171,48 +172,44 @@ export default async function InboxPage({ searchParams }: Props) {
                   {selected.handoff_summary}
                 </p>
               ) : null}
-              <MessageThread messageCount={messages.length}>
-                <ol aria-label="Messages" className="flex flex-col gap-4">
-                  {messages.map((m) => (
-                    <li
-                      key={m.id}
+              <ReplyThread
+                key={selected.id}
+                conversationId={selected.id}
+                messageCount={messages.length}
+                canReply={selected.status !== "resolved"}
+              >
+                {messages.map((m) => (
+                  <li
+                    key={m.id}
+                    className={cn(
+                      "flex flex-col gap-1",
+                      m.role === "patient" ? "items-start" : "items-end",
+                    )}
+                  >
+                    <span className="text-muted text-xs">
+                      {m.role === "patient"
+                        ? "Patient"
+                        : m.role === "assistant"
+                          ? "Dr. Pill"
+                          : m.role === "staff"
+                            ? "Staff"
+                            : "System"}{" "}
+                      · <span className="tabular">{formatTime(m.created_at, tz)}</span>
+                    </span>
+                    <p
                       className={cn(
-                        "flex flex-col gap-1",
-                        m.role === "patient" ? "items-start" : "items-end",
+                        "rounded-card shadow-card max-w-[min(88%,44rem)] px-4 py-3 text-sm leading-6 whitespace-pre-line",
+                        m.role === "patient" && "border-line-strong bg-surface border",
+                        m.role === "assistant" && "bg-mint text-ink",
+                        m.role === "staff" && "bg-ink text-surface",
+                        m.role === "system" && "bg-subtle text-muted",
                       )}
                     >
-                      <span className="text-muted text-xs">
-                        {m.role === "patient"
-                          ? "Patient"
-                          : m.role === "assistant"
-                            ? "Dr. Pill"
-                            : m.role === "staff"
-                              ? "Staff"
-                              : "System"}{" "}
-                        · <span className="tabular">{formatTime(m.created_at, tz)}</span>
-                      </span>
-                      <p
-                        className={cn(
-                          "rounded-card shadow-card max-w-[min(88%,44rem)] px-4 py-3 text-sm leading-6 whitespace-pre-line",
-                          m.role === "patient" && "border-line-strong bg-surface border",
-                          m.role === "assistant" && "bg-mint text-ink",
-                          m.role === "staff" && "bg-ink text-surface",
-                          m.role === "system" && "bg-subtle text-muted",
-                        )}
-                      >
-                        {m.content}
-                      </p>
-                    </li>
-                  ))}
-                </ol>
-              </MessageThread>
-              {selected.status !== "resolved" ? (
-                <ReplyForm conversationId={selected.id} />
-              ) : (
-                <p className="text-muted text-sm">
-                  Resolved. If the patient writes again, Dr. Pill picks the chat back up.
-                </p>
-              )}
+                      {m.content}
+                    </p>
+                  </li>
+                ))}
+              </ReplyThread>
             </>
           )}
         </Card>
