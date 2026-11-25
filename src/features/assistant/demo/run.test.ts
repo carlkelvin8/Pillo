@@ -1,0 +1,55 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const modelCall = vi.fn();
+vi.mock("@/features/assistant/agent/gemini", () => ({
+  createGeminiModelCall: () => modelCall,
+}));
+
+import { runGeminiDemo } from "./run";
+const env = process.env as Record<string, string | undefined>;
+
+const oldNodeEnv = process.env.NODE_ENV;
+afterEach(() => {
+  vi.clearAllMocks();
+  if (oldNodeEnv === undefined) delete env.NODE_ENV;
+  else env.NODE_ENV = oldNodeEnv;
+});
+
+describe("local synthetic Gemini demo", () => {
+  it("refuses production before constructing the Gemini model call", async () => {
+    env.NODE_ENV = "production";
+    await expect(
+      runGeminiDemo({ apiKey: "test-key", question: "What are the clinic hours?" }),
+    ).rejects.toThrow(/local development only/i);
+    expect(modelCall).not.toHaveBeenCalled();
+  });
+
+  it("answers an allowlisted fixture question using only synthetic clinic data", async () => {
+    env.NODE_ENV = "development";
+    modelCall
+      .mockResolvedValueOnce({
+        text: "",
+        stopReason: "tool_use",
+        toolCalls: [{ id: "fixture-1", name: "get_clinic_info", input: {} }],
+      })
+      .mockImplementationOnce(async (request) => {
+        expect(request.messages.at(-1)).toMatchObject({ role: "tool" });
+        expect(JSON.stringify(request.messages.at(-1))).toContain("Demo Family Dental");
+        return { text: "Open Monday to Friday, 9 AM to 5 PM.", stopReason: "end", toolCalls: [] };
+      });
+    const result = await runGeminiDemo({
+      apiKey: "test-key",
+      question: "What are the clinic hours?",
+    });
+    expect(result).toEqual({ reply: "Open Monday to Friday, 9 AM to 5 PM.", steps: 2 });
+    expect(modelCall).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects questions outside the synthetic fixture prompts", async () => {
+    env.NODE_ENV = "development";
+    await expect(
+      runGeminiDemo({ apiKey: "test-key", question: "What is Juan's diagnosis?" }),
+    ).rejects.toThrow(/synthetic demo question/i);
+    expect(modelCall).not.toHaveBeenCalled();
+  });
+});

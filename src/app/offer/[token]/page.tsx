@@ -1,0 +1,127 @@
+import type { Metadata } from "next";
+import { DrPillAvatar } from "@/components/brand/dr-pill-avatar";
+import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
+import { viewOffer, type OfferView } from "@/features/chair-filler/accept";
+import { serverEnv } from "@/lib/env-server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { acceptOfferAction, declineOfferAction } from "./actions";
+
+// The token is in the URL: keep it out of referrers and search engines.
+export const metadata: Metadata = {
+  title: "Open appointment slot",
+  robots: { index: false, follow: false },
+  referrer: "no-referrer",
+};
+export const dynamic = "force-dynamic";
+
+function Shell({
+  mood,
+  title,
+  body,
+}: {
+  mood: "happy" | "sleepy" | "think";
+  title: string;
+  body?: string;
+}) {
+  return (
+    <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
+      <DrPillAvatar mood={mood} size={96} decorative />
+      <h1 className="text-card-title">{title}</h1>
+      {body ? <p className="text-muted">{body}</p> : null}
+    </main>
+  );
+}
+
+export default async function OfferPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ token: string }>;
+  searchParams: Promise<{ r?: string }>;
+}) {
+  const { token: raw } = await params;
+  const { r } = await searchParams;
+  const token = decodeURIComponent(raw);
+
+  if (!serverEnv().SUPABASE_SERVICE_ROLE_KEY) {
+    return (
+      <Shell
+        mood="sleepy"
+        title="This page is not available yet"
+        body="Please contact the clinic directly."
+      />
+    );
+  }
+  if (r === "declined")
+    return (
+      <Shell
+        mood="happy"
+        title="Okay po, salamat!"
+        body="We'll keep you on the waitlist for the next opening."
+      />
+    );
+  if (r === "taken")
+    return (
+      <Shell
+        mood="sleepy"
+        title="Sorry po, kinuha na ang slot"
+        body="Someone else took it just before you. We'll keep you on the waitlist."
+      />
+    );
+
+  const view: OfferView = await viewOffer(createServiceClient(), token);
+
+  if (view.state === "accepted" || r === "accepted")
+    return (
+      <Shell
+        mood="happy"
+        title="Booked na po!"
+        body="Your appointment is confirmed. See you at the clinic. If you can't make it, please tell the clinic early."
+      />
+    );
+  if (view.state === "invalid" || view.state === "closed")
+    return (
+      <Shell
+        mood="sleepy"
+        title="This offer is no longer available"
+        body="Please contact the clinic if you'd like to book."
+      />
+    );
+  if (view.state === "expired")
+    return (
+      <Shell
+        mood="sleepy"
+        title="This offer has expired"
+        body="We'll keep you on the waitlist for the next opening."
+      />
+    );
+
+  if (view.state !== "open") return null;
+  return (
+    <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
+      <DrPillAvatar mood="happy" size={96} decorative />
+      <div className="flex flex-col gap-1">
+        <h1 className="text-card-title">Hi {view.patientFirstName} po! May bakanteng oras</h1>
+        <p className="text-muted">{view.clinicName}</p>
+      </div>
+      <div className="rounded-card border-line bg-surface shadow-card w-full border p-6">
+        <p className="tabular text-xl font-semibold">{view.slotLabel}</p>
+        <p className="text-muted">with {view.doctorName}</p>
+      </div>
+      <form action={acceptOfferAction.bind(null, token)} className="w-full">
+        <SubmitButton variant="mint" className="w-full" pendingLabel="Booking…">
+          Yes, book this for me
+        </SubmitButton>
+      </form>
+      <form action={declineOfferAction.bind(null, token)} className="w-full">
+        <Button type="submit" variant="ghost" className="w-full">
+          No, thank you
+        </Button>
+      </form>
+      <p className="text-muted text-xs">
+        First to confirm gets the slot. This link is private to you.
+      </p>
+    </main>
+  );
+}
