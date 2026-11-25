@@ -43,3 +43,17 @@ export const hoursFormSchema = z.object({
   branchId: z.uuid(),
   days: z.array(dayHoursSchema).length(7),
 });
+
+export const doctorHoursFormSchema = z
+  .object({
+    doctorId: z.uuid(),
+    branchId: z.uuid(),
+    weekday: z.coerce.number().int().min(0).max(6),
+    startsAt: time,
+    endsAt: time,
+    windowId: z.string().optional().transform((value) => value || undefined),
+  })
+  .refine((window) => window.endsAt > window.startsAt, {
+    path: ["endsAt"],
+    message: "End time must be after start time.",
+  });

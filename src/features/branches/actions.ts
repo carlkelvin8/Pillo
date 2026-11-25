@@ -7,11 +7,13 @@ import { getWorkspace } from "@/features/auth/workspace";
 import {
   branchFormSchema,
   doctorFormSchema,
+  doctorHoursFormSchema,
   hoursFormSchema,
   WEEKDAYS,
 } from "@/features/branches/schemas";
 import { echo, formString, validationFailed, type ActionState } from "@/lib/action-state";
 import { createClient } from "@/lib/supabase/server";
+import { doctorHoursOverlap } from "@/features/scheduling/slots";
 
 const DENIED: ActionState = { message: "Only the clinic owner can change this." };
 
@@ -211,4 +213,71 @@ export async function setDoctorActiveAction(
   revalidatePath("/settings/doctors");
   revalidatePath("/appointments");
   return { ok: true };
+}
+
+export async function saveDoctorHoursAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const ctx = await owner();
+  if (!ctx) return DENIED;
+  const parsed = doctorHoursFormSchema.safeParse({
+    doctorId: formString(formData, "doctorId"),
+    branchId: formString(formData, "branchId"),
+    weekday: formString(formData, "weekday"),
+    startsAt: formString(formData, "startsAt"),
+    endsAt: formString(formData, "endsAt"),
+    windowId: formString(formData, "windowId"),
+  });
+  if (!parsed.success) return { message: parsed.error.issues[0]?.message ?? "Check the hours." };
+
+  const supabase = await createClient();
+  const input = parsed.data;
+  const [doctor, branch, existingResult] = await Promise.all([
+    supabase.from("doctors").select("id").eq("clinic_id", ctx.clinicId).eq("id", input.doctorId).maybeSingle(),
+    supabase.from("branches").select("id").eq("clinic_id", ctx.clinicId).eq("id", input.branchId).maybeSingle(),
+    supabase.from("doctor_hours").select("id, weekday, starts_at, ends_at").eq("clinic_id", ctx.clinicId).eq("doctor_id", input.doctorId).eq("branch_id", input.branchId),
+  ]);
+  if (doctor.error || branch.error || existingResult.error || !doctor.data || !branch.data)
+    return { message: "We could not verify that doctor and branch." };
+  const existing = (existingResult.data ?? []).filter((row) => row.id !== input.windowId);
+  if (doctorHoursOverlap(
+    { weekday: input.weekday, start: input.startsAt, end: input.endsAt },
+    existing.map((row) => ({ weekday: row.weekday, start: row.starts_at, end: row.ends_at })),
+  )) return { message: "This window overlaps another window for that doctor." };
+
+  const values = {
+    clinic_id: ctx.clinicId,
+    doctor_id: input.doctorId,
+    branch_id: input.branchId,
+    weekday: input.weekday,
+    starts_at: input.startsAt,
+    ends_at: input.endsAt,
+  };
+  const result = input.windowId
+    ? await supabase.from("doctor_hours").update(values).eq("id", input.windowId).eq("clinic_id", ctx.clinicId).select("id")
+    : await supabase.from("doctor_hours").insert(values).select("id");
+  if (result.error || !result.data?.length) return { message: "We could not save that window." };
+  await logAudit(supabase, ctx.clinicId, "doctor.hours_updated", "doctor", input.doctorId);
+  revalidatePath("/settings/doctors");
+  revalidatePath("/appointments");
+  return { ok: true, message: "Weekly hours saved." };
+}
+
+export async function removeDoctorHoursAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const ctx = await owner();
+  if (!ctx) return DENIED;
+  const id = formString(formData, "windowId");
+  if (!uuid(id)) return { message: "Invalid hours window." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("doctor_hours").delete().eq("id", id).eq("clinic_id", ctx.clinicId).select("doctor_id");
+  if (error || !data?.length) return { message: "We could not remove that window." };
+  const doctorId = data[0]?.doctor_id;
+  if (doctorId) await logAudit(supabase, ctx.clinicId, "doctor.hours_updated", "doctor", String(doctorId));
+  revalidatePath("/settings/doctors");
+  revalidatePath("/appointments");
+  return { ok: true, message: "Weekly hours removed." };
 }

@@ -11,6 +11,8 @@ import { invoiceFormSchema, invoiceIdSchema, recordPaymentSchema } from "./schem
 import { invoiceLabel } from "./totals";
 import { echo, formString, type ActionState } from "@/lib/action-state";
 import { createClient } from "@/lib/supabase/server";
+import { invoiceItemSchema } from "./schemas";
+import { isDateString } from "@/lib/datetime";
 
 const DENIED: ActionState = { message: "You do not have permission to do that." };
 
@@ -131,6 +133,51 @@ export async function sendInvoiceAction(
   revalidatePath(`/invoices/${parsed.data.invoiceId}`);
   revalidatePath("/invoices");
   return { ok: true, message: "Invoice marked as sent." };
+}
+
+export async function updateDraftInvoiceAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const c = await ctx();
+  if (!c) return DENIED;
+  const invoiceId = formString(formData, "invoiceId");
+  const patientId = formString(formData, "patientId");
+  const dueOn = formString(formData, "dueOn");
+  if (!invoiceIdSchema.safeParse({ invoiceId }).success || !/^[0-9a-f-]{36}$/i.test(patientId)) return { message: "Choose a valid patient and invoice." };
+  const itemsRaw = formData.getAll("items").map(String);
+  if (itemsRaw.length < 1 || itemsRaw.length > 50) return { message: "Add between 1 and 50 line items." };
+  const items = [];
+  for (const raw of itemsRaw) {
+    let value: unknown;
+    try { value = JSON.parse(raw); } catch { return { message: "Check the invoice items." }; }
+    const parsedItem = invoiceItemSchema.safeParse(value);
+    if (!parsedItem.success) return { message: parsedItem.error.issues[0]?.message ?? "Check the invoice items." };
+    items.push(parsedItem.data);
+  }
+  if (!isDateString(dueOn)) return { message: "Choose a valid due date." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("update_draft_invoice", {
+    p_clinic_id: c.clinic.id,
+    p_invoice_id: invoiceId,
+    p_patient_id: patientId,
+    p_due_on: dueOn,
+    p_items: items.map((item) => ({ description: item.description, quantity: item.quantity, unit_price_centavos: item.price })),
+  });
+  if (error) return { message: friendly(error, "We could not save that draft invoice.") };
+  await logAudit(supabase, c.clinic.id, "invoice.updated", "invoice", invoiceId, { item_count: items.length });
+  revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath("/invoices");
+  return { ok: true, message: "Draft invoice saved." };
+}
+
+export async function logInvoiceLinkSharedAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const c = await ctx();
+  if (!c) return DENIED;
+  const parsed = invoiceIdSchema.safeParse({ invoiceId: formString(formData, "invoiceId") });
+  if (!parsed.success) return { message: "Invalid invoice." };
+  const supabase = await createClient();
+  const { data } = await supabase.from("payments").select("id").eq("clinic_id", c.clinic.id).eq("invoice_id", parsed.data.invoiceId).eq("status", "pending").not("checkout_url", "is", null).limit(1);
+  if (!data?.length) return { message: "Create a payment link before sharing." };
+  await logAudit(supabase, c.clinic.id, "invoice.link_shared", "invoice", parsed.data.invoiceId);
+  return { ok: true, message: "Share action logged." };
 }
 
 export async function voidInvoiceAction(

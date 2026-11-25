@@ -12,7 +12,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      {/* Browser extensions such as Grammarly add data attributes before hydration. */}
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

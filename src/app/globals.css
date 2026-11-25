@@ -48,7 +48,7 @@
   --text-card-title--font-weight: 600;
 
   /* Layout */
-  --spacing-sidebar: 16rem;
+  --spacing-sidebar: 20rem;
   --spacing-page: 3rem;
 }
 
@@ -57,9 +57,59 @@
   font-variant-numeric: tabular-nums;
 }
 
+.pill-avatar-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pill-avatar-blink 5.2s ease-in-out infinite;
+}
+
+.pill-avatar-mouth {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pill-avatar-talk 240ms ease-in-out infinite alternate;
+}
+
+.pill-avatar-glow {
+  animation: pill-avatar-aura 1.8s ease-in-out infinite;
+}
+
+@keyframes pill-avatar-blink {
+  0%,
+  43%,
+  47%,
+  100% {
+    transform: scaleY(1);
+  }
+  45% {
+    transform: scaleY(0.12);
+  }
+}
+
+@keyframes pill-avatar-talk {
+  from {
+    transform: scaleY(0.78);
+  }
+  to {
+    transform: scaleY(1.18);
+  }
+}
+
+@keyframes pill-avatar-aura {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 3px var(--color-mint-strong));
+    transform: translateY(0);
+  }
+  50% {
+    filter: drop-shadow(0 0 11px var(--color-mint-strong));
+    transform: translateY(-2px);
+  }
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
+    scrollbar-gutter: stable;
   }
   body {
     background-color: var(--color-canvas);

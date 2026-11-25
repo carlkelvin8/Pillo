@@ -81,8 +81,8 @@ Rules:
 
 0. Scaffold, Tailwind tokens, ui components, `/styleguide`, Supabase local config, CI. (done)
 1. Auth, clinics, memberships, RLS, onboarding, app shell. (done; verified on live Supabase)
-2. **Branches**, patients, doctors, appointments, calendar, New appointment, **waitlist**. (done; verified on live Supabase. Left for later: per-doctor hours editor, month view, patient import, balance and billing tab)
-3. Invoices, PayMongo links and webhooks, Payments hub, Dashboard. (built and verified on live Supabase except the real PayMongo round trip, which needs keys. Left for later: editing drafts, PDF download, invoice delivery by SMS/Messenger, the "recovered by Dr. Pill" tile (Phase 4), payment-method fees.)
+2. **Branches**, patients, doctors, appointments, calendar, New appointment, **waitlist**. (done; verified on live Supabase. MVP follow-ups are complete: per-doctor hours, month view, CSV patient import, and patient billing history.)
+3. Invoices, PayMongo links and webhooks, Payments hub, Dashboard. (built; MVP follow-ups are complete: draft editing, on-demand PDF download, and a copyable payment-link message. Real PayMongo round trip still needs provider keys. External invoice sending, the "recovered by Dr. Pill" tile (Phase 4), and payment-method fees remain later work.)
 4. Dr. Pill. **4A (built; chat needs API keys to run live):** avatar, web chat, tools, handoff, inbox, settings, activity log. **4B (built; live accept flow needs the service-role key):** Chair-Filler (ranking, approval in Activity, private offer link, recovered estimate), owner command center. **4C:** Messenger/Viber/SMS sending, payment links in chat, identity verification (OTP) for existing-appointment changes, auto-send autonomy.
 5. MCP server, tokens, permissions UI, audit log.
 6. Patient portal PWA, channel-aware notifications and two-way reminders, landing, polish, e2e.
@@ -93,6 +93,7 @@ Positioning: Dr. Pill is a supervised AI staff member that earns its keep in pes
 
 Candidate differentiators, in rough order of value:
 
+- **Interactive Dr. Pill companion and specialty packs (queued, not scheduled):** an optional, pet-style avatar that can pop up with contextual suggestions, plus push-to-talk, speech-to-text, text-to-speech and voice notes. Add clinic-specific packs over a shared operations core instead of forcing every specialty into one generic patient record: dental, veterinary (pets and owners), pediatrics/maternal-child, animal-bite and vaccination, and wellness/hilot are candidate packs. Packs can define their own intake fields, appointment types, reminders, workflows and approved agent skills. Voice capture needs a clear recording state and consent; recordings should not be retained by default. Clinical notes remain drafts for a licensed clinician to review and sign. Agent actions stay permission-scoped and follow the existing suggest/approve/auto controls.
 - **Recall and unfinished treatment plans**: find patients due for cleaning/follow-up or who left a plan unfinished; personalised Taglish outreach. Likely the largest recovered revenue for dental clinics.
 - **No-show prediction**: classical ML on appointment history; ask for a deposit only on high-risk bookings. Needs enough data per clinic first.
 - **Marketing agent**: seasonal promos, social posts, review replies, and campaign-to-booking attribution. No review gating (against Google policy).

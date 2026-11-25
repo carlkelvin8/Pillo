@@ -10,7 +10,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-/** Slide-in menu for screens narrower than the 256px sidebar breakpoint. */
+/** Slide-in navigation drawer for screens below the desktop sidebar breakpoint. */
 export function MobileNav({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
@@ -29,9 +29,9 @@ export function MobileNav({ children }: { children: ReactNode }) {
           // Close after following a link inside the drawer.
           if ((e.target as HTMLElement).closest("a")) setOpen(false);
         }}
-        className="rounded-r-card top-0 left-0 flex h-full max-h-none w-72 max-w-[85vw] translate-x-0 translate-y-0 flex-col gap-6 overflow-y-auto rounded-none"
+        className="rounded-r-card top-0 left-0 flex h-full max-h-none w-80 max-w-[85vw] translate-x-0 translate-y-0 flex-col gap-6 overflow-y-auto rounded-none"
       >
-        <DialogTitle>Menu</DialogTitle>
+        <DialogTitle className="sr-only">Main menu</DialogTitle>
         <DialogDescription className="sr-only">Main navigation</DialogDescription>
         {children}
       </DialogContent>

@@ -216,6 +216,45 @@ describe("create_invoice (atomic)", () => {
   });
 });
 
+describe("update_draft_invoice (atomic)", () => {
+  it("replaces draft items and patient in one transaction, deriving totals", async () => {
+    const id = await makeInvoice(u.recepA, { items: [{ description: "Old item", qty: 1, price: 500 }] });
+    const [newPatient] = await admin<{ id: string }[]>`insert into public.patients (clinic_id, full_name) values (${clinicA}, 'Second Billing Patient') returning id`;
+    await asUserCommitted(u.recepA, (tx) => tx`select public.update_draft_invoice(${clinicA}, ${id}, ${newPatient!.id}, current_date + 14, ${tx.json([{ description: "Updated", quantity: 2, unit_price_centavos: 700 }] as never)})`);
+    expect((await totals(id))?.total_centavos).toBe("1400");
+    const [invoice] = await admin<{ patient_id: string; due_on: string }[]>`select patient_id, due_on from public.invoices where id = ${id}`;
+    expect(invoice?.patient_id).toBe(newPatient?.id);
+    const [item] = await admin<{ description: string }[]>`select description from public.invoice_items where invoice_id = ${id}`;
+    expect(item?.description).toBe("Updated");
+  });
+
+  it("rolls back all edits when an item fails validation", async () => {
+    const id = await makeInvoice(u.recepA, { items: [{ description: "Keep me", qty: 1, price: 500 }] });
+    const [newPatient] = await admin<{ id: string }[]>`insert into public.patients (clinic_id, full_name) values (${clinicA}, 'Rollback Patient') returning id`;
+    const err = await failure(u.recepA, (tx) => tx`select public.update_draft_invoice(${clinicA}, ${id}, ${newPatient!.id}, current_date + 14, ${tx.json([{ description: "Bad", quantity: 0, unit_price_centavos: 700 }] as never)})`);
+    expect(err.code).toBe("23514");
+    const [item] = await admin<{ description: string }[]>`select description from public.invoice_items where invoice_id = ${id}`;
+    expect(item?.description).toBe("Keep me");
+    expect((await totals(id))?.total_centavos).toBe("500");
+  });
+
+  it("refuses to edit a sent invoice", async () => {
+    const id = await makeInvoice(u.recepA, { send: true });
+    const err = await failure(u.recepA, (tx) => tx`select public.update_draft_invoice(${clinicA}, ${id}, ${patientA}, current_date + 14, ${tx.json([{ description: "Updated", quantity: 1, unit_price_centavos: 700 }] as never)})`);
+    expect(err.code).toBe("P0001");
+  });
+
+  it("refuses to edit a paid invoice", async () => {
+    const id = await makeInvoice(u.recepA, { send: true });
+    await asUserCommitted(u.recepA, async (tx) => {
+      await tx`insert into public.payments (clinic_id, invoice_id, method, amount_centavos, status, provider, paid_at)
+               values (${clinicA}, ${id}, 'cash', 150000, 'succeeded', 'manual', now())`;
+    });
+    const err = await failure(u.recepA, (tx) => tx`select public.update_draft_invoice(${clinicA}, ${id}, ${patientA}, current_date + 14, ${tx.json([{ description: "Updated", quantity: 1, unit_price_centavos: 700 }] as never)})`);
+    expect(err.code).toBe("P0001");
+  });
+});
+
 describe("invoice lifecycle and access", () => {
   it("is frozen once sent", async () => {
     const id = await makeInvoice(u.recepA, { send: true });

@@ -70,7 +70,7 @@ export async function listDoctorHours(clinicId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("doctor_hours")
-    .select("doctor_id, branch_id, weekday, starts_at, ends_at")
+    .select("id, doctor_id, branch_id, weekday, starts_at, ends_at")
     .eq("clinic_id", clinicId);
   check(error, "doctor hours");
   return z.array(doctorHoursRowSchema).parse(data ?? []);

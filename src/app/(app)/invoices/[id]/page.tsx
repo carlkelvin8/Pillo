@@ -15,6 +15,8 @@ import {
   VoidInvoiceButton,
 } from "@/features/invoices/components/invoice-actions";
 import { amountPaid, getInvoice } from "@/features/invoices/queries";
+import { DraftInvoiceEditor } from "@/features/invoices/components/draft-invoice-editor";
+import { ShareInvoiceMessage } from "@/features/invoices/components/share-invoice-message";
 import { displayStatus, invoiceLabel, STATUS_LABEL, STATUS_TONE } from "@/features/invoices/totals";
 import { patientNames } from "@/features/patients/queries";
 import { patientIdLabel } from "@/features/patients/age";
@@ -80,9 +82,11 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           <Chip tone={STATUS_TONE[status]}>{STATUS_LABEL[status]}</Chip>
         </div>
       </div>
+      {invoice.status === "draft" ? <DraftInvoiceEditor invoiceId={invoice.id} dueOn={invoice.due_on} patient={patient ? { id: invoice.patient_id, ...patient } : null} items={items} /> : null}
 
       <div className="grid items-start gap-6 lg:grid-cols-[1.7fr_1fr]">
         <Card className="flex flex-col gap-6">
+            <a href={`/api/invoices/${invoice.id}/pdf`} className="text-ink min-h-11 w-fit font-medium underline">Download PDF</a>
           <div className="flex flex-wrap justify-between gap-4">
             <div>
               <p className="font-semibold">{clinic.name}</p>
@@ -182,6 +186,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                   </p>
                 ) : null}
                 <CopyLink url={openLink.checkout_url} />
+                <ShareInvoiceMessage invoiceId={invoice.id} invoiceNumber={invoice.invoice_number} url={openLink.checkout_url} />
                 <CancelLinkButton paymentId={openLink.id} invoiceId={invoice.id} />
               </div>
             ) : null}

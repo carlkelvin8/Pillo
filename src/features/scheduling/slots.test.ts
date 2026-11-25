@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   doctorWorksOn,
+  doctorHoursOverlap,
   generateSlots,
   isOpenSlot,
   upcomingOpenDates,
@@ -97,5 +98,20 @@ describe("doctorWorksOn", () => {
     expect(doctorWorksOn(TUE, branch, [{ weekday: 3, start: "09:00", end: "12:00" }])).toBe(false);
     expect(doctorWorksOn(TUE, branch, [{ weekday: 2, start: "13:00", end: "17:00" }])).toBe(false); // outside branch hours
     expect(doctorWorksOn(TUE, branch, [{ weekday: 2, start: "10:00", end: "14:00" }])).toBe(true);
+  });
+});
+
+describe("doctorHoursOverlap", () => {
+  const proposed: HourWindow = { weekday: 2, start: "10:00", end: "12:00" };
+
+  it("rejects overlapping windows on the same weekday", () => {
+    expect(doctorHoursOverlap(proposed, [{ weekday: 2, start: "11:30", end: "13:00" }])).toBe(true);
+  });
+
+  it("allows adjacent windows and windows on another weekday", () => {
+    expect(doctorHoursOverlap(proposed, [
+      { weekday: 2, start: "08:00", end: "10:00" },
+      { weekday: 3, start: "10:00", end: "12:00" },
+    ])).toBe(false);
   });
 });

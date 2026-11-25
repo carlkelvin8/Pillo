@@ -160,7 +160,7 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
         {collectedToday ? (
           <Tile
             label="Collected today"
@@ -202,7 +202,7 @@ export default async function DashboardPage() {
         ) : null}
       </div>
 
-      <div className="grid items-start gap-6 lg:grid-cols-2">
+      <div className="grid items-stretch gap-6 lg:grid-cols-2">
         {tx ? (
           <Card className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-3">

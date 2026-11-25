@@ -82,7 +82,7 @@ export default async function PaymentsPage({ searchParams }: Props) {
         <WithdrawDialog available={balance} arrives={arrives} />
       </BalanceHero>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[1.6fr_1fr]">
+      <div className="grid items-stretch gap-6 lg:grid-cols-[1.6fr_1fr]">
         <Card className="flex flex-col gap-4 p-2 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3 px-2 pt-2 sm:px-0 sm:pt-0">
             <CardTitle>Transactions</CardTitle>

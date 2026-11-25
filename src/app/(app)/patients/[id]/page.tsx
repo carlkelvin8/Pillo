@@ -16,10 +16,12 @@ import {
 import { EditPatientDialog } from "@/features/patients/components/patient-dialogs";
 import { getPatient, patientAppointments, patientClinical } from "@/features/patients/queries";
 import { listDoctors } from "@/features/scheduling/queries";
+import { patientBilling } from "@/features/invoices/queries";
 import { STATUS_LABEL, STATUS_TONE } from "@/features/scheduling/status";
 import { createClient } from "@/lib/supabase/server";
 import { dateOf, formatDateShort, formatTime, todayIn } from "@/lib/datetime";
 import { initials } from "@/lib/initials";
+import { formatPHP } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Patient" };
 
@@ -44,10 +46,13 @@ export default async function PatientRecordPage({ params }: Props) {
   const supabase = await createClient();
   await logAudit(supabase, clinicId, "patient.viewed", "patient", id, { role: membership.role });
 
-  const [appointments, clinical, doctors] = await Promise.all([
+  const [appointments, clinical, doctors, billing] = await Promise.all([
     patientAppointments(clinicId, id),
     canRecords ? patientClinical(clinicId, id) : Promise.resolve({ visits: [], prescriptions: [] }),
     listDoctors(clinicId),
+    can(membership.role, "invoices.create") || can(membership.role, "payments.manage")
+      ? patientBilling(clinicId, id)
+      : Promise.resolve(null),
   ]);
   const doctorName = new Map(doctors.map((d) => [d.id, d.display_name]));
 
@@ -187,6 +192,27 @@ export default async function PatientRecordPage({ params }: Props) {
               </ul>
             )}
           </Card>
+          {billing ? (
+            <Card className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <CardTitle>Billing</CardTitle>
+                <span className="tabular font-semibold">Outstanding {formatPHP(billing.outstandingCentavos)}</span>
+              </div>
+              {billing.invoices.length ? (
+                <ul className="divide-line flex flex-col divide-y">
+                  {billing.invoices.map((invoice) => (
+                    <li key={invoice.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+                      <Link href={`/invoices/${invoice.id}`} className="font-medium underline">Invoice #{invoice.invoice_number}</Link>
+                      <span className="tabular">{formatPHP(invoice.total_centavos)}</span>
+                      <Chip tone={invoice.status === "paid" ? "success" : invoice.status === "sent" ? "pending" : "neutral"}>{invoice.status}</Chip>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="text-muted">No invoices yet.</p>}
+              <h3 className="font-semibold">Payment history</h3>
+              {billing.payments.length ? <ul className="divide-line flex flex-col divide-y">{billing.payments.map((payment) => <li key={payment.id} className="flex flex-wrap justify-between gap-2 py-2 text-sm"><span>{payment.method === "cash" ? "Cash" : payment.method === "bank" ? "Bank transfer" : "Online payment"} · {payment.status}</span><span className="tabular">{formatPHP(payment.amount_centavos)}{payment.paid_at ? ` · ${formatDateShort(dateOf(payment.paid_at, tz))}` : ""}</span></li>)}</ul> : <p className="text-muted text-sm">No payments recorded.</p>}
+            </Card>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-6">

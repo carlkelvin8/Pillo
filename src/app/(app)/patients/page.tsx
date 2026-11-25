@@ -9,6 +9,7 @@ import { can } from "@/features/auth/permissions";
 import { requireCapability } from "@/features/auth/workspace";
 import { ageOn, patientIdLabel } from "@/features/patients/age";
 import { AddPatientDialog } from "@/features/patients/components/patient-dialogs";
+import { PatientImport } from "@/features/patients/components/patient-import";
 import {
   listPatients,
   PAGE_SIZE,
@@ -84,6 +85,8 @@ export default async function PatientsPage({ searchParams }: Props) {
         <Stat label="Total patients" value={stats.total} />
         <Stat label="New this month" value={stats.newThisMonth} />
       </div>
+
+      {membership.role === "owner" || membership.role === "receptionist" ? <PatientImport /> : null}
 
       <Card className="flex flex-col gap-5 p-2 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-3 px-2 pt-2">

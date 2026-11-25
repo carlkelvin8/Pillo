@@ -4,14 +4,19 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
 import { requireCapability } from "@/features/auth/workspace";
 import { AddDoctorDialog, DoctorActiveButton } from "@/features/branches/components/doctor-forms";
-import { listDoctors } from "@/features/scheduling/queries";
+import { DoctorHoursEditor } from "@/features/branches/components/doctor-hours-editor";
+import { listBranches, listDoctorHours, listDoctors } from "@/features/scheduling/queries";
 import { initials } from "@/lib/initials";
 
 export const metadata: Metadata = { title: "Doctors" };
 
 export default async function DoctorsSettingsPage() {
   const { membership, user } = await requireCapability("staff.manage");
-  const doctors = await listDoctors(membership.clinic.id);
+  const [doctors, branches, doctorHours] = await Promise.all([
+    listDoctors(membership.clinic.id),
+    listBranches(membership.clinic.id),
+    listDoctorHours(membership.clinic.id),
+  ]);
   const selfListed = doctors.some((d) => d.membership_id === membership.id);
 
   return (
@@ -59,6 +64,11 @@ export default async function DoctorsSettingsPage() {
                   {d.active ? "Bookable" : "Inactive"}
                 </Chip>
                 <DoctorActiveButton doctorId={d.id} active={d.active} name={d.display_name} />
+                <DoctorHoursEditor
+                  doctorId={d.id}
+                  branches={branches}
+                  windows={doctorHours.filter((window) => window.doctor_id === d.id)}
+                />
               </li>
             ))}
           </ul>

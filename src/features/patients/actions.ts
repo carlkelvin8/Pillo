@@ -13,9 +13,26 @@ import {
 import { sanitizeSearch } from "@/features/patients/age";
 import { echo, formString, validationFailed, type ActionState } from "@/lib/action-state";
 import { createClient } from "@/lib/supabase/server";
+import { parsePatientCsv } from "@/features/patients/import-csv";
 
 const DENIED: ActionState = { message: "You do not have permission to do that." };
 const PATIENT_KEYS = ["fullName", "birthdate", "sex", "phone", "email"] as const;
+
+export async function importPatientsCsvAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const ws = await getWorkspace();
+  if (!ws?.membership || !["owner", "receptionist"].includes(ws.membership.role)) return DENIED;
+  const csv = formString(formData, "csv");
+  let parsed;
+  try { parsed = parsePatientCsv(csv); }
+  catch (error) { return { message: error instanceof Error ? error.message : "Invalid CSV." }; }
+  if (!parsed.rows.length) return { message: `No valid rows to import (${parsed.errors.length} have errors).` };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("patients").insert(parsed.rows.map((row) => ({ clinic_id: ws.membership!.clinic.id, ...row }))).select("id");
+  if (error || !data) return { message: "We could not import the patients. No rows were confirmed." };
+  await logAudit(supabase, ws.membership.clinic.id, "patient.imported", "patient_import", null, { imported: data.length, rejected: parsed.errors.length, total: parsed.total });
+  revalidatePath("/patients");
+  return { ok: true, message: `Imported ${data.length} patients; ${parsed.errors.length} rows skipped.` };
+}
 
 function patientInput(formData: FormData) {
   return patientFormSchema.safeParse({

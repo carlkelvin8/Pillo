@@ -3,6 +3,18 @@ import { addDays, fromMinutes, toMinutes, weekdayOf, zonedToUtcIso } from "@/lib
 export type HourWindow = { weekday: number; start: string; end: string };
 export type BusyRange = { startsAt: string; endsAt: string };
 
+/** Returns true when a proposed window intersects another window on the same weekday. */
+export function doctorHoursOverlap(candidate: HourWindow, existing: HourWindow[]): boolean {
+  const start = toMinutes(candidate.start);
+  const end = toMinutes(candidate.end);
+  return existing.some(
+    (window) =>
+      window.weekday === candidate.weekday &&
+      start < toMinutes(window.end) &&
+      end > toMinutes(window.start),
+  );
+}
+
 export const DEFAULT_DURATION_MIN = 30;
 export const DEFAULT_STEP_MIN = 30;
 

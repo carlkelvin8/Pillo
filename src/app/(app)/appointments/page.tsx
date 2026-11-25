@@ -37,6 +37,7 @@ import {
   toBranchWindows,
 } from "@/features/scheduling/queries";
 import { doctorWorksOn, upcomingOpenDates } from "@/features/scheduling/slots";
+import { monthBounds, monthCells, shiftMonth } from "@/features/scheduling/calendar-month";
 import {
   isDateString,
   addDays,
@@ -89,7 +90,7 @@ export default async function AppointmentsPage({ searchParams }: Props) {
 
   const today = todayIn(tz);
   const anchor = params.date && isDateString(params.date) ? params.date : today;
-  const view = params.view === "day" ? "day" : "week";
+  const view = params.view === "day" || params.view === "month" ? params.view : "week";
 
   const [branches, doctors, allHours, doctorHours] = await Promise.all([
     listBranches(clinicId),
@@ -102,8 +103,9 @@ export default async function AppointmentsPage({ searchParams }: Props) {
   const branchWindows = branch ? toBranchWindows(allHours, branch.id) : [];
 
   const weekStart = startOfWeek(anchor);
-  const rangeStart = view === "day" ? anchor : weekStart;
-  const rangeEndExclusive = view === "day" ? addDays(anchor, 1) : addDays(weekStart, 7);
+  const monthRange = view === "month" ? monthBounds(anchor) : null;
+  const rangeStart = view === "day" ? anchor : monthRange?.start ?? weekStart;
+  const rangeEndExclusive = view === "day" ? addDays(anchor, 1) : monthRange?.end ?? addDays(weekStart, 7);
   const { start: fromIso } = dayBoundsUtc(rangeStart, tz);
   const { start: toIso } = dayBoundsUtc(rangeEndExclusive, tz);
 
@@ -215,11 +217,13 @@ export default async function AppointmentsPage({ searchParams }: Props) {
     const s = q.toString();
     return s ? `/appointments?${s}` : "/appointments";
   };
-  const step = view === "day" ? 1 : 7;
+  const step = view === "day" ? 1 : view === "month" ? 0 : 7;
   const title =
     view === "day"
       ? `${WEEKDAY_NAMES[weekdayOf(anchor)]}, ${formatDateLong(anchor)}`
-      : formatWeekRange(days[0] ?? weekStart, days[days.length - 1] ?? weekStart);
+      : view === "month"
+        ? new Intl.DateTimeFormat("en-PH", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${monthRange?.start}T12:00:00Z`))
+        : formatWeekRange(days[0] ?? weekStart, days[days.length - 1] ?? weekStart);
 
   const doctorOptions = doctors.map((d) => ({
     id: d.id,
@@ -268,13 +272,13 @@ export default async function AppointmentsPage({ searchParams }: Props) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Button asChild variant="ghost" size="icon" aria-label="Previous">
-                <Link href={href({ date: addDays(anchor, -step) })}>
+                <Link href={href({ date: view === "month" ? shiftMonth(anchor, -1) : addDays(anchor, -step) })}>
                   <ChevronLeft aria-hidden="true" />
                 </Link>
               </Button>
               <h2 className="text-card-title min-w-44 text-center">{title}</h2>
               <Button asChild variant="ghost" size="icon" aria-label="Next">
-                <Link href={href({ date: addDays(anchor, step) })}>
+                <Link href={href({ date: view === "month" ? shiftMonth(anchor, 1) : addDays(anchor, step) })}>
                   <ChevronRight aria-hidden="true" />
                 </Link>
               </Button>
@@ -283,7 +287,7 @@ export default async function AppointmentsPage({ searchParams }: Props) {
               </Button>
             </div>
             <nav aria-label="View" className="flex gap-1.5">
-              {(["week", "day"] as const).map((v) => (
+              {(["week", "day", "month"] as const).map((v) => (
                 <Link
                   key={v}
                   href={href({ view: v === "week" ? undefined : v })}
@@ -293,7 +297,7 @@ export default async function AppointmentsPage({ searchParams }: Props) {
                     view === v ? "bg-ink text-surface" : "text-muted hover:text-ink",
                   )}
                 >
-                  {v === "week" ? "Week" : "Day"}
+                  {v === "week" ? "Week" : v === "day" ? "Day" : "Month"}
                 </Link>
               ))}
             </nav>
@@ -302,7 +306,7 @@ export default async function AppointmentsPage({ searchParams }: Props) {
           {branches.length > 1 || doctors.length > 1 ? (
             <form action="/appointments" method="get" className="flex flex-wrap items-end gap-3">
               {anchor !== today ? <input type="hidden" name="date" value={anchor} /> : null}
-              {view === "day" ? <input type="hidden" name="view" value="day" /> : null}
+              {view !== "week" ? <input type="hidden" name="view" value={view} /> : null}
               {branches.length > 1 ? (
                 <label className="text-muted flex flex-col gap-1 text-xs">
                   Branch
@@ -334,7 +338,20 @@ export default async function AppointmentsPage({ searchParams }: Props) {
             </form>
           ) : null}
 
-          <div className="overflow-x-auto">
+          {view === "month" ? (
+            <div className="grid grid-cols-7 gap-2" aria-label="Appointments by month">
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => <p key={day} className="text-muted px-2 py-1 text-center text-xs font-semibold">{day}</p>)}
+              {monthCells(anchor).map((day, index) => {
+                const count = day ? appointments.filter((appointment) => dateOf(appointment.starts_at, tz) === day).length : 0;
+                return day ? (
+                  <Link key={day} href={href({ date: day, view: "day" })} className="border-line bg-surface hover:bg-canvas flex min-h-24 flex-col rounded-control border p-2">
+                    <span className={cn("text-sm font-semibold", day === today && "text-mint-ink")}>{Number(day.slice(8))}</span>
+                    <span className="text-muted mt-auto text-xs">{count} {count === 1 ? "appointment" : "appointments"}</span>
+                  </Link>
+                ) : <span key={`empty-${index}`} aria-hidden="true" />;
+              })}
+            </div>
+          ) : <div className="overflow-x-auto">
             <div className="flex" style={{ minWidth: days.length * 120 + 64 }}>
               <div className="w-16 shrink-0" style={{ paddingTop: HEADER_PX }} aria-hidden="true">
                 {hours.map((h) => (
@@ -397,7 +414,7 @@ export default async function AppointmentsPage({ searchParams }: Props) {
                 })}
               </div>
             </div>
-          </div>
+          </div>}
         </Card>
 
         <div className="flex flex-col gap-6">

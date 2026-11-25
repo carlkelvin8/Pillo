@@ -94,6 +94,7 @@ export const doctorRowSchema = z.object({
 export type Doctor = z.infer<typeof doctorRowSchema>;
 
 export const doctorHoursRowSchema = z.object({
+  id: z.uuid(),
   doctor_id: z.uuid(),
   branch_id: z.uuid(),
   weekday: z.number().int().min(0).max(6),

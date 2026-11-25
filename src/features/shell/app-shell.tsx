@@ -16,9 +16,17 @@ type AppShellProps = {
   children: ReactNode;
 };
 
-/** 256px sidebar + top bar (search, notifications) + page content. */
+/** 320px sidebar + top bar (search, notifications) + page content. */
 export function AppShell({ user, role, clinicName, children }: AppShellProps) {
   const groups = navForRole(role);
+  const sidebarHeader = (
+    <div className="flex flex-col gap-1 px-1">
+      <Link href="/dashboard" aria-label={`${APP_NAME} dashboard`} className="w-fit">
+        <Logo className="[&_svg]:size-10" />
+      </Link>
+      <p className="text-muted truncate pl-[50px] text-xs">{clinicName}</p>
+    </div>
+  );
   const sidebarBody = (
     <>
       <SidebarNav groups={groups} />
@@ -30,13 +38,8 @@ export function AppShell({ user, role, clinicName, children }: AppShellProps) {
 
   return (
     <div className="bg-canvas flex min-h-screen">
-      <aside className="w-sidebar border-line bg-surface sticky top-0 hidden h-screen shrink-0 flex-col gap-7 self-start overflow-y-auto border-r px-4 py-5 lg:flex">
-        <div className="flex flex-col gap-1 px-1">
-          <Link href="/dashboard" aria-label={`${APP_NAME} dashboard`} className="w-fit">
-            <Logo />
-          </Link>
-          <p className="text-muted truncate pl-[42px] text-xs">{clinicName}</p>
-        </div>
+      <aside className="w-sidebar border-line bg-surface sticky top-0 hidden h-screen shrink-0 flex-col gap-7 self-start overflow-y-auto border-r px-5 py-5 lg:flex">
+        {sidebarHeader}
         {sidebarBody}
       </aside>
 
@@ -45,7 +48,10 @@ export function AppShell({ user, role, clinicName, children }: AppShellProps) {
           <div className="flex w-full max-w-[96rem] items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <MobileNav>
-                <div className="flex flex-1 flex-col gap-7">{sidebarBody}</div>
+                <div className="flex flex-1 flex-col gap-7">
+                  {sidebarHeader}
+                  {sidebarBody}
+                </div>
               </MobileNav>
               {/* Search and notifications are placeholders until Patients (Phase 2) and Notifications (Phase 6). */}
               <label className="rounded-control border-line bg-surface text-muted flex min-h-11 max-w-90 flex-1 items-center gap-2.5 border px-4">

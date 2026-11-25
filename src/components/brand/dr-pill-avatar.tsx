@@ -1,7 +1,15 @@
 import { useId } from "react";
 import { ASSISTANT_NAME } from "@/config/brand";
+import { cn } from "@/lib/utils";
 
-export type DrPillMood = "happy" | "wink" | "think" | "sleepy";
+export type DrPillMood =
+  | "happy"
+  | "wink"
+  | "think"
+  | "sleepy"
+  | "listening"
+  | "talking"
+  | "excited";
 
 type DrPillAvatarProps = {
   mood?: DrPillMood;
@@ -17,6 +25,9 @@ const MOOD_LABEL: Record<DrPillMood, string> = {
   wink: "winking",
   think: "thinking",
   sleepy: "sleepy",
+  listening: "listening",
+  talking: "speaking",
+  excited: "excited",
 };
 
 /**
@@ -40,7 +51,11 @@ export function DrPillAvatar({
       width={size}
       height={(size * 150) / 124}
       fill="none"
-      className={className}
+      className={cn(
+        "pill-avatar",
+        (mood === "listening" || mood === "talking" || mood === "excited") && "pill-avatar-glow",
+        className,
+      )}
       {...a11y}
     >
       <defs>
@@ -129,6 +144,7 @@ function OpenEye({ cx, dx = 0, dy = 0 }: { cx: number; dx?: number; dy?: number 
 
 function Face({ mood }: { mood: DrPillMood }) {
   const stroke = { stroke: "var(--color-ink)", strokeWidth: 3.5, strokeLinecap: "round" } as const;
+  const eyesClassName = "pill-avatar-eyes";
 
   if (mood === "sleepy") {
     return (
@@ -142,25 +158,65 @@ function Face({ mood }: { mood: DrPillMood }) {
   if (mood === "think") {
     return (
       <g>
-        <OpenEye cx={46} dx={2} dy={-3} />
-        <OpenEye cx={78} dx={2} dy={-3} />
+        <g className={eyesClassName}>
+          <OpenEye cx={46} dx={2} dy={-3} />
+          <OpenEye cx={78} dx={2} dy={-3} />
+        </g>
         <circle cx="62" cy="69" r="3" {...stroke} />
+      </g>
+    );
+  }
+  if (mood === "listening") {
+    return (
+      <g>
+        <g className={eyesClassName}>
+          <OpenEye cx={46} dy={-2} />
+          <OpenEye cx={78} dy={-2} />
+        </g>
+        <ellipse cx="62" cy="69" rx="4" ry="5" fill="var(--color-ink)" />
+      </g>
+    );
+  }
+  if (mood === "talking") {
+    return (
+      <g>
+        <g className={eyesClassName}>
+          <path d="M38 53Q46 59 54 53" {...stroke} />
+          <path d="M70 53Q78 59 86 53" {...stroke} />
+        </g>
+        <ellipse className="pill-avatar-mouth" cx="62" cy="69" rx="5" ry="6" fill="var(--color-ink)" />
+        <ellipse cx="62" cy="72" rx="2.5" ry="1.5" fill="var(--color-blush)" />
+      </g>
+    );
+  }
+  if (mood === "excited") {
+    return (
+      <g>
+        <g className={eyesClassName}>
+          <path d="M46 42L48 48L54 50L48 52L46 58L44 52L38 50L44 48Z" fill="var(--color-ink)" />
+          <path d="M78 42L80 48L86 50L80 52L78 58L76 52L70 50L76 48Z" fill="var(--color-ink)" />
+        </g>
+        <path d="M51 64Q62 80 73 64Q72 78 62 78Q52 78 51 64Z" fill="var(--color-ink)" />
       </g>
     );
   }
   if (mood === "wink") {
     return (
       <g>
-        <OpenEye cx={46} />
-        <path d="M70 54Q78 46 86 54" {...stroke} />
+        <g className={eyesClassName}>
+          <OpenEye cx={46} />
+          <path d="M70 54Q78 46 86 54" {...stroke} />
+        </g>
         <path d="M54 65Q62 76 70 65" {...stroke} />
       </g>
     );
   }
   return (
     <g>
-      <OpenEye cx={46} />
-      <OpenEye cx={78} />
+      <g className={eyesClassName}>
+        <OpenEye cx={46} />
+        <OpenEye cx={78} />
+      </g>
       <path d="M54 65Q62 76 70 65" {...stroke} />
     </g>
   );
