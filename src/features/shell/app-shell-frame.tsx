@@ -31,16 +31,15 @@ export function AppShellFrame({
       /* storage can be unavailable (private mode); the sidebar just starts expanded */
     }
   }, []);
-  const toggle = () =>
-    setCollapsed((value) => {
-      const next = !value;
-      try {
-        window.localStorage.setItem(SIDEBAR_KEY, next ? "compact" : "full");
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
+  const toggle = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    try {
+      window.localStorage.setItem(SIDEBAR_KEY, next ? "compact" : "full");
+    } catch {
+      /* ignore */
+    }
+  };
 
   return (
     <div

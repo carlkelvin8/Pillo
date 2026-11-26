@@ -91,9 +91,9 @@
 }
 
 .app-shell[data-sidebar-collapsed="true"] .sidebar-nav-link {
-  width: 2.5rem;
-  height: 2.5rem;
-  min-height: 2.5rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  min-height: 2.75rem;
   margin-inline: auto;
   justify-content: center;
   gap: 0;
@@ -114,8 +114,10 @@
 
 .app-shell[data-sidebar-collapsed="true"] .sidebar-user-avatar,
 .app-shell[data-sidebar-collapsed="true"] .sidebar-sign-out {
-  width: 2rem;
-  height: 2rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
 }
 
 .app-shell[data-sidebar-collapsed="true"] .sidebar-user-card form {

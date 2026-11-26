@@ -15,8 +15,9 @@ const membershipRowSchema = z.object({
   clinic: clinicRowSchema,
 });
 
-const CLINIC_COLUMNS =
-  "id, name, address, phone, email, timezone, logo_path, assistant_settings, onboarding_completed_at";
+const CLINIC_COLUMNS_BASE =
+  "id, name, address, phone, email, timezone, assistant_settings, onboarding_completed_at";
+const CLINIC_COLUMNS = `${CLINIC_COLUMNS_BASE}, logo_path`;
 
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const supabase = await createClient();
@@ -45,13 +46,20 @@ export const getWorkspace = cache(async (): Promise<Workspace | null> => {
   // `afterInvite` changes the query text on purpose: Next.js memoizes identical GET fetches within
   // one render, so repeating the same query after the RPC would return the stale "no membership".
   const load = async (afterInvite = false): Promise<Membership | null> => {
-    const { data, error } = await supabase
-      .from("memberships")
-      .select(`id, role${afterInvite ? ", created_at" : ""}, clinic:clinics(${CLINIC_COLUMNS})`)
-      // RLS lets members see every membership in their clinic, so always filter to the caller's own.
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: true })
-      .limit(1);
+    const query = (columns: string, extra: string) =>
+      supabase
+        .from("memberships")
+        .select(`id, role${extra}, clinic:clinics(${columns})`)
+        // RLS lets members see every membership in their clinic, so always filter to the caller's own.
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true })
+        .limit(1);
+    let { data, error } = await query(CLINIC_COLUMNS, afterInvite ? ", created_at" : "");
+    if (error?.code === "42703") {
+      // Migration 20261205 (logo_path) is not applied yet: retry once without it. The query text
+      // differs on purpose (see above) so the memoized failing fetch is not reused.
+      ({ data, error } = await query(CLINIC_COLUMNS_BASE, ", created_at"));
+    }
     if (error) throw new Error(`Could not load membership (${error.code})`);
     const row = data?.[0];
     return row ? membershipRowSchema.parse(row) : null;

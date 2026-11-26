@@ -84,3 +84,28 @@ it("waits for the reply to persist, then starts the status update and audit toge
   await expect(send).resolves.toEqual({ ok: true });
   expect(mock.revalidatePath).toHaveBeenCalledExactlyOnceWith("/dr-pill");
 });
+
+it("reports a failed takeover after the reply was stored", async () => {
+  const clinicId = "a0b1c2d3-1234-4123-8123-120000000000";
+  const form = new FormData();
+  form.set("conversationId", "a0b1c2d3-1234-4123-8123-120000000001");
+  form.set("message", "Hello");
+  mock.revalidatePath.mockClear();
+  mock.getWorkspace.mockResolvedValue({
+    membership: { role: "receptionist", clinic: { id: clinicId } },
+  });
+  mock.createClient.mockResolvedValue({
+    from: (table: string) => {
+      if (table === "messages") return { insert: async () => ({ error: null }) };
+      if (table === "conversations")
+        return {
+          update: () => ({ eq: () => ({ eq: async () => ({ error: { code: "XX000" } }) }) }),
+        };
+      throw new Error(`Unexpected table ${table}`);
+    },
+    rpc: async () => ({ error: null }),
+  });
+  const result = await sendStaffMessageAction({}, form);
+  expect(result.ok).toBeUndefined();
+  expect(result.message).toContain("could not take over the chat");
+});

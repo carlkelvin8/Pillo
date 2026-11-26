@@ -1,4 +1,15 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+/** The hero entrance animations run for under a second; measure only after the finite ones are done. */
+async function settle(page: Page) {
+  await page.evaluate(async () => {
+    const finite = document.getAnimations().filter((a) => {
+      const t = a.effect?.getComputedTiming();
+      return t !== undefined && Number.isFinite(t.endTime);
+    });
+    await Promise.all(finite.map((a) => a.finished.catch(() => undefined)));
+  });
+}
 
 test("keeps hero copy and signup visible on compact and landscape screens", async ({ page }) => {
   for (const viewport of [
@@ -10,6 +21,7 @@ test("keeps hero copy and signup visible on compact and landscape screens", asyn
   ]) {
     await page.setViewportSize(viewport);
     await page.goto("/");
+    await settle(page);
 
     const hero = page.locator("#hero");
     const header = await page.getByRole("banner").boundingBox();
@@ -36,6 +48,7 @@ test("keeps the desktop hero CTA separate from its mascot", async ({ page }) => 
   ]) {
     await page.setViewportSize(viewport);
     await page.goto("/");
+    await settle(page);
 
     const hero = page.locator("#hero");
     const header = await page.getByRole("banner").boundingBox();

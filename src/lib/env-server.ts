@@ -13,13 +13,16 @@ const serverEnvSchema = z.object({
   LIVE_AI_ENABLED: z.boolean().optional(),
   DATABASE_URL: z.url().optional(),
   /** Connection for the MCP route as the least-privilege `pillo_mcp` role (see the 20261206 migration). */
-  DATABASE_URL_MCP: z.url().optional(),
+  DATABASE_URL_MCP: z
+    .string()
+    .refine((value) => /^postgres(ql)?:\/\//.test(value), "Must start with postgres:// or postgresql://")
+    .optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
 
 export function serverEnv(): ServerEnv {
-  const parsed = serverEnvSchema.safeParse({
+  const raw: Record<string, unknown> = {
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || undefined,
     PAYMONGO_SECRET_KEY: process.env.PAYMONGO_SECRET_KEY || undefined,
     PAYMONGO_WEBHOOK_SECRET: process.env.PAYMONGO_WEBHOOK_SECRET || undefined,
@@ -29,6 +32,12 @@ export function serverEnv(): ServerEnv {
     LIVE_AI_ENABLED: process.env.LIVE_AI_ENABLED === "true",
     DATABASE_URL: process.env.DATABASE_URL || undefined,
     DATABASE_URL_MCP: process.env.DATABASE_URL_MCP || undefined,
-  });
-  return parsed.success ? parsed.data : {};
+  };
+  // Parse each key on its own so one bad value only drops itself.
+  const env: Record<string, unknown> = {};
+  for (const [key, schema] of Object.entries(serverEnvSchema.shape)) {
+    const parsed = schema.safeParse(raw[key]);
+    if (parsed.success && parsed.data !== undefined) env[key] = parsed.data;
+  }
+  return env as ServerEnv;
 }

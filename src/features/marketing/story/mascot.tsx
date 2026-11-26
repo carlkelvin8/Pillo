@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { DrPillAvatar, type DrPillMood } from "@/components/brand/dr-pill-avatar";
-import { clamp, lerp, prefersReducedMotion, smooth, story, subscribeFrame } from "./store";
+import { clamp, lerp, motionSupported, smooth, story, subscribeFrame } from "./store";
 
 const BASE_WIDTH = 120;
 const MOODS: DrPillMood[] = ["happy", "wink", "think", "sleepy", "listening", "talking", "excited"];
@@ -26,7 +26,7 @@ export function StoryMascot() {
   const wrap = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setEnabled(!prefersReducedMotion());
+    setEnabled(motionSupported());
   }, []);
 
   useEffect(() => {

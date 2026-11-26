@@ -2,8 +2,12 @@ import { z } from "zod";
 
 export const SEARCH_LIMIT = 5;
 
-/** Characters that have meaning inside a PostgREST `or()` filter or an ILIKE pattern. */
-const UNSAFE = /[%_\\,()*"'`:;]/g;
+/**
+ * Characters with meaning inside a PostgREST `or()` filter (`,` `(` `)` `"`), an ILIKE pattern
+ * (`%` `_` `\\`) or PostgREST's `*` wildcard alias. Apostrophes, colons and the like are plain
+ * text in an unquoted value, so names such as O'Brien keep working.
+ */
+const UNSAFE = /[%_\\,()*"]/g;
 
 export const searchQuerySchema = z
   .string()

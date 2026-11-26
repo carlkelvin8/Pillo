@@ -1,7 +1,7 @@
 "use client";
 
 import { ImagePlus, Trash2 } from "lucide-react";
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { SubmitButton } from "@/components/ui/submit-button";
@@ -22,6 +22,20 @@ export function ClinicLogoForm({ clinicName, logoUrl }: Props) {
   const [clientError, setClientError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const shown = preview ?? logoUrl;
+
+  // Release the previous object URL whenever the chosen file changes, and on unmount.
+  useEffect(() => {
+    if (!preview) return;
+    return () => URL.revokeObjectURL(preview);
+  }, [preview]);
+
+  // After a saved upload or removal, show the stored state and reset the picker.
+  useEffect(() => {
+    if (!state.ok && !removeState.ok) return;
+    setPreview(null);
+    setClientError(null);
+    if (input.current) input.current.value = "";
+  }, [state, removeState]);
   const initial = clinicName.trim().charAt(0).toUpperCase() || "C";
 
   return (

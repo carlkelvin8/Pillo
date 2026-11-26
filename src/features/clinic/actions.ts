@@ -148,6 +148,18 @@ export async function completeOnboardingAction(): Promise<void> {
   redirect("/dashboard");
 }
 
+/** Deletes a stored logo file. Failures are logged (error code only) and never block the user. */
+async function removeLogoObject(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  path: string,
+): Promise<void> {
+  const { error } = await supabase.storage.from(LOGO_BUCKET).remove([path]);
+  if (error) {
+    const code = (error as { statusCode?: string; code?: string }).statusCode ?? "unknown";
+    console.error(`Could not delete old clinic logo (${code})`);
+  }
+}
+
 /** Settings > Clinic profile: upload the clinic logo (owners only; png, jpeg or webp up to 1 MB). */
 export async function uploadClinicLogoAction(
   _prev: ActionState,
@@ -171,6 +183,14 @@ export async function uploadClinicLogoAction(
     .upload(path, bytes, { contentType: type, cacheControl: "31536000" });
   if (upload.error) return { message: "We could not upload the logo. Please try again." };
 
+  // Re-read the stored path right before replacing it: the request-start snapshot may be stale.
+  const { data: current } = await supabase
+    .from("clinics")
+    .select("logo_path")
+    .eq("id", clinic.id)
+    .maybeSingle();
+  const previousPath = (current as { logo_path?: string | null } | null)?.logo_path ?? null;
+
   const { data, error } = await supabase
     .from("clinics")
     .update({ logo_path: path })
@@ -180,7 +200,7 @@ export async function uploadClinicLogoAction(
     await supabase.storage.from(LOGO_BUCKET).remove([path]);
     return { message: "We could not save the logo." };
   }
-  if (clinic.logo_path) await supabase.storage.from(LOGO_BUCKET).remove([clinic.logo_path]);
+  if (previousPath && previousPath !== path) await removeLogoObject(supabase, previousPath);
 
   await logAudit(supabase, clinic.id, "clinic.logo_updated", "clinic", clinic.id);
   revalidatePath("/", "layout");
@@ -192,9 +212,15 @@ export async function removeClinicLogoAction(): Promise<ActionState> {
   if (!ws?.membership || ws.membership.role !== "owner") return DENIED;
   const clinic = ws.membership.clinic;
   const supabase = await createClient();
+  const { data: current } = await supabase
+    .from("clinics")
+    .select("logo_path")
+    .eq("id", clinic.id)
+    .maybeSingle();
+  const storedPath = (current as { logo_path?: string | null } | null)?.logo_path ?? null;
   const { error } = await supabase.from("clinics").update({ logo_path: null }).eq("id", clinic.id);
   if (error) return { message: "We could not remove the logo." };
-  if (clinic.logo_path) await supabase.storage.from(LOGO_BUCKET).remove([clinic.logo_path]);
+  if (storedPath) await removeLogoObject(supabase, storedPath);
   await logAudit(supabase, clinic.id, "clinic.logo_removed", "clinic", clinic.id);
   revalidatePath("/", "layout");
   return { ok: true, message: "Logo removed." };

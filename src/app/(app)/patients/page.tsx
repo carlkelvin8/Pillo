@@ -197,7 +197,8 @@ export default async function PatientsPage({ searchParams }: Props) {
                         <Link
                           href={`/patients/${p.id}`}
                           prefetch={false}
-                          aria-label={`View patient ${p.full_name}`}
+                          tabIndex={-1}
+                          aria-hidden="true"
                         >
                           View
                           <ChevronRight aria-hidden="true" />

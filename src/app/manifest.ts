@@ -7,6 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: `${APP_NAME} clinic`,
     short_name: APP_NAME,
     description: "Appointments, patient records and payment records for your clinic.",
+    id: "/",
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",
@@ -14,8 +15,7 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: PWA_THEME,
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
-      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
     ],
   };
 }

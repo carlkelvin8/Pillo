@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { clamp, hasFinePointer, lerp, prefersReducedMotion, subscribeFrame } from "./store";
+import { clamp, hasFinePointer, lerp, motionSupported, subscribeFrame } from "./store";
 
 const INTERACTIVE = "a, button, [data-cursor], summary, input, select, textarea, label";
 
@@ -17,7 +17,7 @@ export function StoryCursor() {
   const label = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    setEnabled(hasFinePointer() && !prefersReducedMotion());
+    setEnabled(hasFinePointer() && motionSupported());
   }, []);
 
   useEffect(() => {

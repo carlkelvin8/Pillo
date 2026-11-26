@@ -8,10 +8,18 @@ const PUBLIC_PREFIXES = ["/styleguide", "/api/webhooks", "/api/mcp", "/pay", "/c
 /** Sign-in pages: signed-in users are sent to the app instead. */
 const AUTH_PAGES = new Set(["/login", "/signup", "/forgot-password"]);
 
+/** Whole-segment match: "/pay" and "/pay/x" are public, "/payments" is not. */
+export function isPublicPath(pathname: string): boolean {
+  return (
+    PUBLIC_EXACT.has(pathname) ||
+    PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))
+  );
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (PUBLIC_EXACT.has(pathname) || PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
+  if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 

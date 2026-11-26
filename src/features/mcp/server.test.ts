@@ -12,7 +12,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import type { SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { APP_NAME } from "@/config/brand";
-import { buildMcpServer } from "./server";
+import { buildMcpServer, safeToolMessage } from "./server";
 import type { McpAuth } from "./auth";
 
 const auth: McpAuth = { tokenId: "token-id", clinicId: "clinic-id", scopes: [] };
@@ -43,6 +43,7 @@ async function post(authContext: McpAuth, message: unknown, protocolVersion?: st
 
 describe("MCP Streamable HTTP server", () => {
   beforeEach(() => {
+    vi.unstubAllEnvs();
     execute.mockReset().mockResolvedValue([]);
     transaction.mockReset();
     transaction.mockImplementation((work: (tx: { execute: typeof execute }) => Promise<unknown>) => work({ execute }));
@@ -138,6 +139,7 @@ describe("MCP Streamable HTTP server", () => {
   });
 
   it("creates a payment proposal without creating a payment link", async () => {
+    vi.stubEnv("ONLINE_PAYMENTS_ENABLED", "true");
     execute
       .mockResolvedValueOnce([{ id: "invoice-id", invoice_number: 42, total_centavos: "50000", status: "sent" }])
       .mockResolvedValueOnce([{ paid_centavos: "12000" }])
@@ -150,6 +152,49 @@ describe("MCP Streamable HTTP server", () => {
     expect(JSON.parse(result.content[0]!.text)).toEqual({ request_id: "proposal-id", status: "awaiting_staff_approval" });
     expect(execute).toHaveBeenCalledTimes(3);
     expect(audit).toHaveBeenCalledWith({ ...auth, scopes: ["payments:request"] }, "request_payment", "success");
+  });
+
+  it("refuses payment requests while online payments are disabled", async () => {
+    vi.stubEnv("ONLINE_PAYMENTS_ENABLED", "false");
+    const response = await post({ ...auth, scopes: ["payments:request"] }, {
+      jsonrpc: "2.0", id: 20, method: "tools/call",
+      params: { name: "request_payment", arguments: { invoice_id: "11111111-1111-4111-8111-111111111111" } },
+    }, "2025-06-18");
+    const result = response.body.result as { isError: boolean; content: { text: string }[] };
+    expect(result.isError).toBe(true);
+    expect(result.content[0]!.text).toBe("Online payment requests are not available yet.");
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("keeps a committed success when the audit write fails", async () => {
+    execute.mockResolvedValueOnce([{ id: "invoice-id", invoice_number: 42, status: "draft" }]);
+    audit.mockRejectedValueOnce(Object.assign(new Error("secret detail"), { code: "XX000" }));
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const response = await post({ ...auth, scopes: ["invoices:write"] }, {
+      jsonrpc: "2.0", id: 21, method: "tools/call",
+      params: { name: "create_invoice", arguments: {
+        patient_id: "11111111-1111-4111-8111-111111111111", due_on: "2026-12-10",
+        items: [{ description: "Consultation", quantity: 1, unit_price_centavos: 50000 }],
+      } },
+    }, "2025-06-18");
+    const result = response.body.result as { isError?: boolean };
+    expect(result.isError).toBeUndefined();
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain("secret detail");
+    errorLog.mockRestore();
+  });
+
+  it("does not leak raw database errors to the client", async () => {
+    execute.mockRejectedValueOnce(Object.assign(new Error('relation "x" violates something'), { code: "23505" }));
+    const response = await post({ ...auth, scopes: ["invoices:write"] }, {
+      jsonrpc: "2.0", id: 22, method: "tools/call",
+      params: { name: "create_invoice", arguments: {
+        patient_id: "11111111-1111-4111-8111-111111111111", due_on: "2026-12-10",
+        items: [{ description: "Consultation", quantity: 1, unit_price_centavos: 50000 }],
+      } },
+    }, "2025-06-18");
+    const result = response.body.result as { isError: boolean; content: { text: string }[] };
+    expect(result.isError).toBe(true);
+    expect(result.content[0]!.text).toBe("The request could not be completed.");
   });
 
   it("returns patient demographics and appointment summary without clinical fields", async () => {
@@ -236,5 +281,15 @@ describe("MCP Streamable HTTP server", () => {
     const itemInsert = new PgDialect().sqlToQuery(execute.mock.calls[1]![0] as SQL);
     expect(itemInsert.sql).toMatch(/insert into public\.invoice_items/);
     expect(itemInsert.params).toContain(auth.clinicId);
+  });
+});
+
+describe("safeToolMessage", () => {
+  it("passes our own errors through and maps database errors", () => {
+    expect(safeToolMessage(new Error("This token needs the x scope."))).toBe("This token needs the x scope.");
+    expect(safeToolMessage(Object.assign(new Error("exclusion violated"), { code: "23P01" }))).toBe("That time is no longer available.");
+    expect(safeToolMessage(Object.assign(new Error("boom"), { code: "42501" }))).toBe("The request could not be completed.");
+    expect(safeToolMessage({ code: "23P01" })).toBe("That time is no longer available.");
+    expect(safeToolMessage("weird")).toBe("The request could not be completed.");
   });
 });

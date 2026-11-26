@@ -67,7 +67,10 @@ async function find(svc: SupabaseClient, token: string): Promise<OfferRecord | n
   return r.success ? r.data : null;
 }
 
-async function clinicOf(svc: SupabaseClient, clinicId: string) {
+type ClinicInfo = { name: string; timezone: string; websiteUrl: string | null };
+
+/** Strict lookup: null when the clinic (and so its timezone) cannot be loaded. */
+async function loadClinic(svc: SupabaseClient, clinicId: string): Promise<ClinicInfo | null> {
   let { data, error } = await svc
     .from("clinics")
     .select("name, timezone, website_url")
@@ -81,13 +84,29 @@ async function clinicOf(svc: SupabaseClient, clinicId: string) {
       .eq("id", clinicId)
       .maybeSingle());
   }
-  if (error) return { name: "the clinic", timezone: "Asia/Manila", websiteUrl: null };
+  if (error) return null;
   const c = z.object({ name: z.string(), timezone: z.string() }).safeParse(data);
+  if (!c.success) return null;
   return {
-    name: c.data?.name ?? "the clinic",
-    timezone: c.data?.timezone ?? "Asia/Manila",
+    name: c.data.name,
+    timezone: c.data.timezone,
     websiteUrl: clinicWebsiteSchema.safeParse(data?.website_url).data ?? null,
   };
+}
+
+/** Lenient lookup for display only: falls back to defaults. */
+async function clinicOf(svc: SupabaseClient, clinicId: string): Promise<ClinicInfo> {
+  return (
+    (await loadClinic(svc, clinicId)) ?? {
+      name: "the clinic",
+      timezone: "Asia/Manila",
+      websiteUrl: null,
+    }
+  );
+}
+
+function logFailure(label: string, error: { code?: string } | null | undefined) {
+  if (error) console.error(label, error.code ?? "unknown");
 }
 
 async function branchOf(svc: SupabaseClient, offer: OfferRecord) {
@@ -149,7 +168,9 @@ export async function acceptOffer(
 ): Promise<AcceptResult> {
   const o = await find(svc, token);
   if (!o || offerState(o, now) !== "open") return "closed";
-  const clinic = await clinicOf(svc, o.clinic_id);
+  // The timezone decides whether the slot is still open: never guess it.
+  const clinic = await loadClinic(svc, o.clinic_id);
+  if (!clinic) return "closed";
 
   // 1. Claim the offer atomically: only one request can move it from sent to accepted.
   const { data: claimed } = await svc
@@ -170,47 +191,58 @@ export async function acceptOffer(
     await record(svc, o, "failed", "Slot was no longer available");
   };
 
-  // 2. The slot must still be open (hours, doctor schedule, other bookings).
-  const date = dateOf(o.starts_at, clinic.timezone);
-  const ctx = await loadSlotContext(svc, {
-    clinicId: o.clinic_id,
-    branchId: o.branch_id,
-    doctorId: o.doctor_id,
-    date,
-    tz: clinic.timezone,
-  });
-  const durationMin = Math.round(
-    (new Date(o.ends_at).getTime() - new Date(o.starts_at).getTime()) / 60_000,
-  );
-  if (!isOpenSlot({ date, tz: clinic.timezone, durationMin, ...ctx, now }, o.starts_at)) {
-    await release();
-    return "taken";
+  let apptId: string;
+  try {
+    // 2. The slot must still be open (hours, doctor schedule, other bookings).
+    const date = dateOf(o.starts_at, clinic.timezone);
+    const ctx = await loadSlotContext(svc, {
+      clinicId: o.clinic_id,
+      branchId: o.branch_id,
+      doctorId: o.doctor_id,
+      date,
+      tz: clinic.timezone,
+    });
+    const durationMin = Math.round(
+      (new Date(o.ends_at).getTime() - new Date(o.starts_at).getTime()) / 60_000,
+    );
+    if (!isOpenSlot({ date, tz: clinic.timezone, durationMin, ...ctx, now }, o.starts_at)) {
+      await release();
+      return "taken";
+    }
+
+    // 3. Book it. The database exclusion constraint is the final guard against double-booking.
+    const { data: appt, error } = await svc
+      .from("appointments")
+      .insert({
+        clinic_id: o.clinic_id,
+        branch_id: o.branch_id,
+        patient_id: o.patient_id,
+        doctor_id: o.doctor_id,
+        starts_at: o.starts_at,
+        ends_at: o.ends_at,
+        reason: "Offered slot (Chair-Filler)",
+        status: "scheduled",
+        source: "ai",
+        send_reminder: true,
+      })
+      .select("id")
+      .single();
+    if (error || !appt) {
+      await release();
+      return error?.code === OVERLAP ? "taken" : "closed";
+    }
+    apptId = String((appt as { id: unknown }).id);
+  } catch {
+    try {
+      await release();
+    } catch {
+      console.error("chair_filler.release_failed");
+    }
+    return "closed";
   }
 
-  // 3. Book it. The database exclusion constraint is the final guard against double-booking.
-  const { data: appt, error } = await svc
-    .from("appointments")
-    .insert({
-      clinic_id: o.clinic_id,
-      branch_id: o.branch_id,
-      patient_id: o.patient_id,
-      doctor_id: o.doctor_id,
-      starts_at: o.starts_at,
-      ends_at: o.ends_at,
-      reason: "Offered slot (Chair-Filler)",
-      status: "scheduled",
-      source: "ai",
-      send_reminder: true,
-    })
-    .select("id")
-    .single();
-  if (error || !appt) {
-    await release();
-    return error?.code === OVERLAP ? "taken" : "closed";
-  }
-  const apptId = String((appt as { id: unknown }).id);
-
-  await Promise.all([
+  // The booking exists: later write failures are logged (code only) but never undo it.
+  const writes = await Promise.all([
     svc
       .from("slot_offers")
       .update({ filled_appointment_id: apptId })
@@ -230,7 +262,7 @@ export async function acceptOffer(
           .update({ status: "booked" })
           .eq("id", o.waitlist_entry_id)
           .eq("clinic_id", o.clinic_id)
-      : Promise.resolve(),
+      : Promise.resolve({ error: null }),
     svc.from("audit_log").insert({
       clinic_id: o.clinic_id,
       actor_type: "ai",
@@ -240,6 +272,13 @@ export async function acceptOffer(
       meta: { via: "chair_filler" },
     }),
   ]);
+  const labels = [
+    "chair_filler.link_appointment_failed",
+    "chair_filler.expire_siblings_failed",
+    "chair_filler.waitlist_update_failed",
+    "chair_filler.audit_failed",
+  ];
+  writes.forEach((w, i) => logFailure(labels[i] ?? "chair_filler.write_failed", w?.error));
   await record(svc, o, "executed", "Filled an open slot", apptId);
   return "accepted";
 }

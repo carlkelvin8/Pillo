@@ -518,6 +518,19 @@
   display: none;
   font-weight: 600;
 }
+/* Phones show the one-line caption above; the full list stays in the page for screen readers. */
+@media (max-width: 639px) {
+  .story-sm-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
 @media (max-width: 639px) {
   .story-now {
     display: grid;
@@ -1196,6 +1209,16 @@
   }
 }
 
+/* ---------- tablets in portrait: a smaller orbit keeps the headline clear of the header ---------- */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .story-orbit {
+    max-width: 15rem;
+  }
+  .story-orbit .story-spot {
+    width: 7rem;
+  }
+}
+
 /* ---------- landscape phones: short screens get a two-column hero so the headline and button stay in view ---------- */
 @media (orientation: landscape) and (max-height: 520px) {
   .story-hero-content {
@@ -1260,6 +1283,110 @@
     opacity: 1;
   }
   .story-scroll-cue {
+    display: none;
+  }
+}
+
+/* ---------- finished state without the media query: old webviews (no observers) and short screens ---------- */
+.story-root[data-motion="reduced"] .story-scene {
+  --p: 1;
+  --in: 1;
+}
+.story-root[data-motion="reduced"] .story-track {
+  height: auto !important;
+}
+.story-root[data-motion="reduced"] .story-stage {
+  position: relative;
+  height: auto;
+  min-height: 100svh;
+  padding-block: 5rem;
+  transform: none;
+  border-radius: 0;
+}
+.story-root[data-motion="reduced"] :is(.story-hero-content, .story-finale-title, .story-capsule, .story-glow) {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+.story-root[data-motion="reduced"] :is(.story-band-track, .story-soon-row) {
+  transform: none !important;
+}
+.story-root[data-motion="reduced"] .story-soon-rows {
+  overflow: hidden;
+}
+.story-root[data-motion="reduced"] :is(.story-now, .story-step-body) {
+  opacity: 1;
+}
+.story-root[data-motion="reduced"] .story-scroll-cue {
+  display: none;
+}
+
+/*
+ * Short screens (max-height 640px): pinned scenes would clip, so every scene except the hero (which has its
+ * own short-screen layout) shows its finished state. story-root sets data-compact and stops writing --p/--in.
+ */
+.story-root[data-compact="true"] .story-scene:not(.story-hero-scene) {
+  --p: 1;
+  --in: 1;
+}
+.story-root[data-compact="true"] .story-scene:not(.story-hero-scene) .story-track {
+  height: auto !important;
+}
+.story-root[data-compact="true"] .story-scene:not(.story-hero-scene) .story-stage {
+  position: relative;
+  height: auto;
+  min-height: 100svh;
+  padding-block: 5rem;
+  transform: none;
+  border-radius: 0;
+}
+.story-root[data-compact="true"] .story-finale-title {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+.story-root[data-compact="true"] :is(.story-band-track, .story-soon-row) {
+  transform: none !important;
+}
+.story-root[data-compact="true"] .story-soon-rows {
+  overflow: hidden;
+}
+.story-root[data-compact="true"] .story-step-body {
+  opacity: 1;
+}
+.story-root[data-compact="true"] .story-mascot {
+  display: none;
+}
+.story-root[data-compact="true"] .story-spot > svg {
+  visibility: visible;
+}
+
+/* In a finished-state layout nothing scrubs, so the full lists show on phones and the one-line caption goes. */
+.story-root[data-motion="reduced"] .story-sm-sr,
+.story-root[data-compact="true"] .story-sm-sr {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip-path: none;
+  white-space: normal;
+}
+.story-root[data-motion="reduced"] .story-now,
+.story-root[data-compact="true"] .story-now {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .story-sm-sr {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+  }
+  .story-now {
     display: none;
   }
 }

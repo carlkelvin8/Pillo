@@ -70,6 +70,15 @@ describe("clinics.logo_path", () => {
     expect(err.code).toBe("23514");
   });
 
+  it("rejects a path inside another clinic's folder", async () => {
+    const err = await failure(
+      u.ownerA,
+      (tx) =>
+        tx`update public.clinics set logo_path = ${`${clinicB}/logo-1700000000000.png`} where id = ${clinicA}`,
+    );
+    expect(err.code).toBe("23514");
+  });
+
   it("does not let non-owners change the logo", async () => {
     for (const who of [u.doctorA, u.recepA]) {
       const rows = await asUser(
