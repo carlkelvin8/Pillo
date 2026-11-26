@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
@@ -66,6 +67,8 @@ export default async function PaymentsPage({ searchParams }: Props) {
     if (p > 1) query.set("page", String(p));
     return query.size ? `/payments?${query}` : "/payments";
   };
+
+  if (page > pages) redirect(href(filter, pages));
 
   return (
     <>
@@ -154,7 +157,7 @@ export default async function PaymentsPage({ searchParams }: Props) {
                   {t.invoiceId ? (
                     <Link
                       href={`/invoices/${t.invoiceId}`}
-                      className="font-semibold wrap-anywhere hover:underline"
+                      className="inline-flex min-h-11 items-center font-semibold wrap-anywhere hover:underline"
                     >
                       {t.title}
                     </Link>

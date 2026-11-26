@@ -291,5 +291,11 @@ describe("safeToolMessage", () => {
     expect(safeToolMessage(Object.assign(new Error("boom"), { code: "42501" }))).toBe("The request could not be completed.");
     expect(safeToolMessage({ code: "23P01" })).toBe("That time is no longer available.");
     expect(safeToolMessage("weird")).toBe("The request could not be completed.");
+    // Drizzle wraps the driver error: no SQL or parameters may reach the client.
+    const wrapped = new Error("Failed query: insert into public.invoices ... params: secret", {
+      cause: Object.assign(new Error("fk"), { code: "23503" }),
+    });
+    expect(safeToolMessage(wrapped)).toBe("The request could not be completed.");
+    expect(safeToolMessage(new Error("Failed query: select 1"))).toBe("The request could not be completed.");
   });
 });

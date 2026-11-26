@@ -105,6 +105,9 @@ export function HeaderSearch({ className = "" }: HeaderSearchProps) {
             setQuery(event.target.value);
             setResults([]);
             setActive(-1);
+            setFailed(false);
+            // Show "Searching…" during the debounce instead of a false "No matches."
+            setLoading(event.target.value.trim().length >= 2);
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
@@ -127,7 +130,7 @@ export function HeaderSearch({ className = "" }: HeaderSearchProps) {
               }
             }
           }}
-          className="placeholder:text-muted w-full min-w-0 bg-transparent text-sm outline-none"
+          className="placeholder:text-muted min-h-11 w-full min-w-0 self-stretch bg-transparent text-sm outline-none"
         />
       </div>
       <p className="sr-only" role="status" aria-live="polite">

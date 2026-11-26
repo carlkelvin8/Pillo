@@ -48,6 +48,14 @@ describe("DrPillCompanion", () => {
     expect(screen.queryByRole("region", { name: "Dr. Pill help" })).toBeNull();
   });
 
+  it("closes the help panel with Escape", () => {
+    render(<DrPillCompanion role="doctor" />);
+    fireEvent.click(screen.getByRole("button", { name: "Open Dr. Pill help" }));
+    expect(screen.getByRole("region", { name: "Dr. Pill help" })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("region", { name: "Dr. Pill help" })).not.toBeInTheDocument();
+  });
+
   it("changes expression on hover and keeps animation controls automatic", () => {
     render(<DrPillCompanion role="owner" />);
 

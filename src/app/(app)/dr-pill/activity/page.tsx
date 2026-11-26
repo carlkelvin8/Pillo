@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
@@ -30,7 +31,7 @@ const KIND_LABEL: Record<string, string> = {
 export default async function ActivityPage({ searchParams }: Props) {
   const { membership } = await requireCapability("inbox.view");
   const params = await searchParams;
-  const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
+  const requestedPage = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
   const clinic = membership.clinic;
   const tz = clinic.timezone;
   const today = todayIn(tz);
@@ -40,7 +41,7 @@ export default async function ActivityPage({ searchParams }: Props) {
     membership.role !== "billing";
   const [{ rows: actions, total: actionTotal }, counts, offers, summary, mcpPaymentRequests] =
     await Promise.all([
-      listActions(clinic.id, page),
+      listActions(clinic.id, requestedPage),
       actionCountsSince(clinic.id, zonedToUtcIso(today, "00:00", tz)),
       canOffers ? listOffers(clinic.id) : Promise.resolve([]),
       canOffers ? getChairFillerSummary(clinic.id) : Promise.resolve(null),
@@ -48,6 +49,10 @@ export default async function ActivityPage({ searchParams }: Props) {
     ]);
   const open = offers.filter((o) => o.status === "proposed" || o.status === "sent");
   const actionPages = Math.max(1, Math.ceil(actionTotal / ACTION_PAGE_SIZE));
+  // A page past the end (old link, shrinking log) lands on the last page instead of an error.
+  if (requestedPage > actionPages)
+    redirect(actionPages > 1 ? `/dr-pill/activity?page=${actionPages}` : "/dr-pill/activity");
+  const page = requestedPage;
 
   return (
     <>

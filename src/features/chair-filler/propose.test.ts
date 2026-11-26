@@ -27,10 +27,15 @@ const wait = (n: number, over = {}) => ({
 type Tables = Record<string, unknown>;
 function fake(t: Tables, upsertError: { code: string } | null = null) {
   const upsert = vi.fn();
+  const statusFilters: unknown[] = [];
   const chain = (table: string) => {
     const result = { data: t[table] ?? [], count: (t.count as number) ?? 0, error: null };
     const q: Record<string, unknown> = {};
-    for (const m of ["select", "eq", "in", "gte", "lt", "gt"]) q[m] = () => q;
+    for (const m of ["select", "eq", "gte", "lt", "gt"]) q[m] = () => q;
+    q.in = (col: string, values: unknown) => {
+      if (col === "status") statusFilters.push(values);
+      return q;
+    };
     q.maybeSingle = () =>
       Promise.resolve({ data: table === "appointments" ? t.appt : t.rule, error: null });
     q.then = (r: (v: unknown) => unknown) => Promise.resolve(result).then(r);
@@ -46,7 +51,7 @@ function fake(t: Tables, upsertError: { code: string } | null = null) {
     };
     return q;
   };
-  return { client: { from: chain } as unknown as SupabaseClient, upsert };
+  return { client: { from: chain } as unknown as SupabaseClient, upsert, statusFilters };
 }
 const base = (over: Tables = {}): Tables => ({
   appt,
@@ -68,6 +73,12 @@ describe("proposeOffers", () => {
     expect(await run(f.client)).toBe(2);
     const rows = f.upsert.mock.calls[0]![0] as { patient_id: string }[];
     expect(rows.map((r) => r.patient_id)).toEqual([U(11), U(12)]);
+  });
+  it("only filters busy patients by real appointment_status enum values", async () => {
+    const f = fake(base());
+    await run(f.client);
+    // "arrived" is not in the enum: Postgres would reject the whole query and the busy check would silently vanish.
+    expect(f.statusFilters).toEqual([["scheduled", "confirmed"]]);
   });
   it("skips patients without consent", async () => {
     const f = fake(base({ patients: [{ id: U(12), consent_at: "x" }] }));

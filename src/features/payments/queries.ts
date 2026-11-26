@@ -72,6 +72,18 @@ export async function listTransactions(
     query = query.limit(limitOrPage);
   }
   const { data, count, error } = await query;
+  if (error?.code === "PGRST103" && paginated) {
+    // Page is past the last row: report the total so the page can clamp to the last page.
+    let c = supabase
+      .from("payments")
+      .select("id", { count: "exact", head: true })
+      .eq("clinic_id", clinicId)
+      .in("status", ["succeeded", "pending"]);
+    if (filter === "pending") c = c.eq("status", "pending");
+    const counted = await c;
+    check(counted.error, "payments");
+    return { items: [], total: counted.count ?? 0 };
+  }
   check(error, "payments");
   const payments = z.array(paymentRow).parse(data ?? []);
 

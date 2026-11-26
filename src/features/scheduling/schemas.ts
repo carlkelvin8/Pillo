@@ -22,7 +22,7 @@ const optionalText = (max: number) =>
   z
     .string()
     .trim()
-    .max(max)
+    .max(max, `Keep this to ${max} characters or fewer.`)
     .transform((v) => (v === "" ? undefined : v))
     .optional();
 

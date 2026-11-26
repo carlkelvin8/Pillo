@@ -124,6 +124,7 @@ export default async function InboxPage({ searchParams }: Props) {
             </div>
           ) : (
             <ConversationList
+              key={filter}
               initialItems={list.map((conversation) => ({
                 id: conversation.id,
                 status: conversation.status,

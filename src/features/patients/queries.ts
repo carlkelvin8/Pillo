@@ -41,6 +41,18 @@ export async function listPatients(args: {
   if (q) query = query.or(`full_name.ilike.%${q}%,phone.ilike.%${q}%`);
   if (args.filter === "new") query = query.gte("created_at", args.monthStartIso);
   const { data, count, error } = await query;
+  if (error?.code === "PGRST103") {
+    // The requested page is past the last row: PostgREST refuses the range. Report the total so the page can clamp.
+    let countQuery = supabase
+      .from("patients")
+      .select("id", { count: "exact", head: true })
+      .eq("clinic_id", args.clinicId);
+    if (q) countQuery = countQuery.or(`full_name.ilike.%${q}%,phone.ilike.%${q}%`);
+    if (args.filter === "new") countQuery = countQuery.gte("created_at", args.monthStartIso);
+    const counted = await countQuery;
+    check(counted.error, "patients");
+    return { rows: [], total: counted.count ?? 0 };
+  }
   check(error, "patients");
   return { rows: z.array(patientRowSchema).parse(data ?? []), total: count ?? 0 };
 }

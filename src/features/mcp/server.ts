@@ -65,19 +65,26 @@ async function assertOpenSlot(db: McpQueryDb, args: {
   }, args.startsAt)) throw new Error("That time is not an available appointment slot.");
 }
 
-/** Message safe to show an MCP client: our own Errors pass through, database errors are mapped. */
+const GENERIC_MESSAGE = "The request could not be completed.";
+
+function pgCode(error: unknown): string | undefined {
+  for (let e: unknown = error, i = 0; e && typeof e === "object" && i < 3; i++) {
+    const code = (e as { code?: unknown }).code;
+    if (typeof code === "string" && code.length === 5) return code;
+    e = (e as { cause?: unknown }).cause;
+  }
+  return undefined;
+}
+
+/**
+ * Message safe to show an MCP client: our own Errors pass through, database errors are mapped.
+ * Drizzle wraps driver errors ("Failed query: ... params: ...") and keeps the SQLSTATE on `cause`.
+ */
 export function safeToolMessage(error: unknown): string {
-  if (error instanceof Error) {
-    const code = (error as { code?: unknown }).code;
-    if (typeof code !== "string" || code.length !== 5) return error.message;
-    return code === "23P01" ? "That time is no longer available." : "The request could not be completed.";
-  }
-  if (typeof error === "object" && error !== null) {
-    const code = (error as { code?: unknown }).code;
-    if (typeof code === "string" && code.length === 5)
-      return code === "23P01" ? "That time is no longer available." : "The request could not be completed.";
-  }
-  return "The request could not be completed.";
+  const code = pgCode(error);
+  if (code) return code === "23P01" ? "That time is no longer available." : GENERIC_MESSAGE;
+  if (error instanceof Error && !/^Failed query:/i.test(error.message)) return error.message;
+  return GENERIC_MESSAGE;
 }
 
 /** Audit is best-effort after the work has committed: it never changes the tool result. */

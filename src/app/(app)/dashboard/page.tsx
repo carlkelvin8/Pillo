@@ -258,7 +258,7 @@ export default async function DashboardPage() {
                         {canOpenPatients ? (
                           <Link
                             href={`/patients/${a.patient_id}`}
-                            className="truncate font-semibold hover:underline"
+                            className="inline-flex min-h-11 max-w-full items-center truncate font-semibold hover:underline"
                           >
                             {name}
                           </Link>

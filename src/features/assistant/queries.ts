@@ -50,6 +50,7 @@ export async function listConversations(
   if (filter === "needs") q = q.eq("status", "needs_human");
   const from = (Math.max(1, page) - 1) * CONVERSATION_PAGE_SIZE;
   const { data, count, error } = await q.range(from, from + CONVERSATION_PAGE_SIZE - 1);
+  if (error?.code === "PGRST103") return { rows: [], total: count ?? 0 };
   check(error, "conversations");
   return { rows: z.array(conversationRow).parse(data ?? []), total: count ?? 0 };
 }
@@ -150,6 +151,16 @@ export async function listActions(
     .neq("kind", "reply")
     .order("created_at", { ascending: false })
     .range(from, from + ACTION_PAGE_SIZE - 1);
+  if (error?.code === "PGRST103") {
+    // Page is past the last row: PostgREST refuses the range. Report the total so the page can clamp.
+    const counted = await supabase
+      .from("agent_actions")
+      .select("id", { count: "exact", head: true })
+      .eq("clinic_id", clinicId)
+      .neq("kind", "reply");
+    check(counted.error, "activity");
+    return { rows: [], total: counted.count ?? 0 };
+  }
   check(error, "activity");
   return { rows: z.array(actionRow).parse(data ?? []), total: count ?? 0 };
 }

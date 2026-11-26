@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { emailSchema } from "@/features/auth/schemas";
-import { isDateString } from "@/lib/datetime";
+import { DEFAULT_TZ, isDateString, todayIn } from "@/lib/datetime";
 
 const optionalText = (max: number) =>
   z
     .string()
     .trim()
-    .max(max)
+    .max(max, `Keep this to ${max} characters or fewer.`)
     .transform((v) => (v === "" ? undefined : v))
     .optional();
 
@@ -27,7 +27,11 @@ const optionalNumber = (min: number, max: number, label: string) =>
 export const SEXES = ["female", "male", "other"] as const;
 
 export const patientFormSchema = z.object({
-  fullName: z.string().trim().min(1, "Enter the patient's name.").max(120),
+  fullName: z
+    .string()
+    .trim()
+    .min(1, "Enter the patient's name.")
+    .max(120, "Keep the name to 120 characters or fewer."),
   birthdate: z
     .string()
     .trim()
@@ -37,7 +41,7 @@ export const patientFormSchema = z.object({
         .string()
         .refine(isDateString, "Enter a valid date.")
         .refine(
-          (v) => v >= "1900-01-01" && v <= new Date().toISOString().slice(0, 10),
+          (v) => v >= "1900-01-01" && v <= todayIn(DEFAULT_TZ),
           "Birthdate cannot be in the future.",
         )
         .optional(),
@@ -89,7 +93,11 @@ export const visitFormSchema = z.object({
 
 export const prescriptionFormSchema = z.object({
   patientId: z.uuid(),
-  medication: z.string().trim().min(1, "Enter the medication.").max(120),
+  medication: z
+    .string()
+    .trim()
+    .min(1, "Enter the medication.")
+    .max(120, "Keep this to 120 characters or fewer."),
   dosage: optionalText(120),
 });
 

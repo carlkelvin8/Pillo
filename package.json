@@ -21,7 +21,8 @@
     "test:db": "bash scripts/test-db.sh",
     "ai:demo": "tsx scripts/gemini-demo.ts",
     "seed:qa": "tsx scripts/seed-qa.ts",
-    "ai:eval": "tsx scripts/dr-pill-eval.ts"
+    "ai:eval": "tsx scripts/dr-pill-eval.ts",
+    "e2e:verify": "E2E_VERIFY=1 playwright test e2e/verify-"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",

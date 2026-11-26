@@ -20,7 +20,7 @@ export function AuthShell({ title, subtitle, tabs, children }: AuthShellProps) {
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       <main className="bg-surface flex flex-1 flex-col justify-between gap-10 px-6 py-10 sm:px-12 lg:px-20 lg:py-12">
-        <Link href="/" aria-label={`${APP_NAME} home`} className="w-fit">
+        <Link href="/" aria-label={`${APP_NAME} home`} className="inline-flex min-h-11 w-fit items-center">
           <Logo />
         </Link>
 

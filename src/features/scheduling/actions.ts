@@ -207,9 +207,14 @@ export async function setAppointmentStatusAction(
     .update(patch)
     .eq("id", parsed.data.appointmentId)
     .eq("clinic_id", ctx.clinic.id)
+    // Only open appointments change status: a stale dialog or double submit must not re-cancel, complete a
+    // cancelled visit or draft the same offers twice.
+    .in("status", ["scheduled", "confirmed"])
     .select("id");
   if (error?.code === OVERLAP) return TAKEN;
-  if (error || !data?.length) return { message: "We could not update that appointment." };
+  if (error) return { message: "We could not update that appointment." };
+  if (!data?.length)
+    return { message: "This appointment was already updated. Reload to see its current status." };
 
   await logAudit(
     supabase,
@@ -254,6 +259,19 @@ export async function addWaitlistAction(
   if (!parsed.success) return validationFailed(parsed.error, formData, ["reason"]);
 
   const supabase = await createClient();
+  // One active entry per patient: a second one would only double-list them (and double-submit would add twice).
+  const { data: existing } = await supabase
+    .from("waitlist_entries")
+    .select("id")
+    .eq("clinic_id", ctx.clinic.id)
+    .eq("patient_id", parsed.data.patientId)
+    .in("status", ["waiting", "offered"])
+    .limit(1);
+  if (existing?.length)
+    return {
+      message: "This patient is already on the waitlist. Remove the old entry first to change it.",
+      values: echo(formData, ["reason"]),
+    };
   const { data, error } = await supabase
     .from("waitlist_entries")
     .insert({

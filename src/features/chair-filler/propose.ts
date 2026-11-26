@@ -83,7 +83,7 @@ export async function proposeOffers(
         .select("patient_id, starts_at, ends_at")
         .eq("clinic_id", args.clinicId)
         .in("patient_id", ids)
-        .in("status", ["scheduled", "confirmed", "arrived"])
+        .in("status", ["scheduled", "confirmed"])
         .lt("starts_at", slot.ends_at)
         .gt("ends_at", slot.starts_at),
     ]);

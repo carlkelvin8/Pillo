@@ -103,6 +103,16 @@ export function DrPillCompanion({ role }: { role: Role }) {
     };
   }, []);
 
+  // Escape closes the help panel, like every other popover in the app.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
   const savePosition = (next: Position) => {
     const clamped = clampPosition(next);
     setPosition(clamped);

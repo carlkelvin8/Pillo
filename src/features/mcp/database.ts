@@ -3,6 +3,12 @@ import { sql } from "drizzle-orm";
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { serverEnv } from "@/lib/env-server";
 
+/** Same rule as mcpDatabase(): production needs DATABASE_URL_MCP, development may fall back to DATABASE_URL. */
+export function mcpDatabaseConfigured(): boolean {
+  const env = serverEnv();
+  return Boolean(env.DATABASE_URL_MCP ?? (process.env.NODE_ENV === "production" ? undefined : env.DATABASE_URL));
+}
+
 let client: PostgresJsDatabase | undefined;
 
 export type McpQueryDb = Pick<PostgresJsDatabase, "execute">;

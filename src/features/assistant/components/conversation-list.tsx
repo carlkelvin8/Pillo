@@ -37,12 +37,14 @@ export function ConversationList({
   const loadingRef = useRef(false);
 
   useEffect(() => {
-    setItems((current) => {
-      return [
-        ...initialItems,
-        ...current.filter((item) => !initialItems.some((next) => next.id === item.id)),
-      ];
-    });
+    // Refresh replaces the first page with fresh data and keeps only rows loaded from later pages,
+    // so a conversation that changed (resolved, handed back) never lingers with a stale chip.
+    setItems((current) => [
+      ...initialItems,
+      ...current
+        .slice(initialItems.length)
+        .filter((item) => !initialItems.some((next) => next.id === item.id)),
+    ]);
     setTotal(initialTotal);
   }, [initialItems, initialTotal]);
 
