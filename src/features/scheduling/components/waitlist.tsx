@@ -121,10 +121,9 @@ export function WaitlistRemoveButton({ entryId, name }: { entryId: string; name:
   );
 }
 
-export function OutreachChip({ ok }: { ok: boolean }) {
-  return ok ? (
-    <Chip tone="success">OK to message</Chip>
-  ) : (
-    <Chip tone="neutral">No contact consent</Chip>
-  );
+/** Offers go out only when the entry allows outreach AND the patient has recorded contact consent. */
+export function OutreachChip({ outreach, consented }: { outreach: boolean; consented: boolean }) {
+  if (outreach && consented) return <Chip tone="success">OK to message</Chip>;
+  if (outreach) return <Chip tone="pending">Needs patient consent</Chip>;
+  return <Chip tone="neutral">Outreach off</Chip>;
 }

@@ -386,7 +386,7 @@ export default async function AppointmentsPage({ searchParams }: Props) {
                         )}
                       </div>
                       <div className="border-line flex items-center justify-between gap-2 border-t pt-2">
-                        <OutreachChip ok={w.outreach_ok} />
+                        <OutreachChip outreach={w.outreach_ok} consented={w.consented} />
                         <WaitlistRemoveButton entryId={w.id} name={name} />
                       </div>
                     </li>

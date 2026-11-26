@@ -8,7 +8,9 @@ describe("DrPillSkillsLab", () => {
 
     expect(screen.getByRole("log", { name: "Dr. Pill conversation" })).toBeInTheDocument();
     expect(screen.getByLabelText("Ask Dr. Pill a question")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /^(Appointments|Recall|Medical question)$/ })).toHaveLength(3);
+    expect(
+      screen.getAllByRole("button", { name: /^(Appointments|Recall|Medical question)$/ }),
+    ).toHaveLength(3);
   });
 
   it("keeps packs, workflows and the Gemini FAQ collapsed under Explore skills", () => {
@@ -36,8 +38,12 @@ describe("DrPillSkillsLab", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Send message" }));
 
-    expect(screen.getByText(/bring any previous vaccination records if available/i)).toBeInTheDocument();
-    expect(screen.getByText(/pet name and species, pet age, and visit reason/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/bring any previous vaccination records if available/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/pet name and species, pet age, and visit reason/i),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/appointment request/i)).not.toBeInTheDocument();
   });
 
@@ -48,7 +54,11 @@ describe("DrPillSkillsLab", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Send message" }));
 
-    expect(screen.getByText(/I can help with appointments, recalls, billing steps, or visit preparation/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /I can help with appointments, recalls, billing steps, or visit preparation/i,
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/appointment request/i)).not.toBeInTheDocument();
   });
 });

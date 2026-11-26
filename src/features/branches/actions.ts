@@ -123,12 +123,14 @@ export async function saveHoursAction(
   }
   const supabase = await createClient();
   const { branchId } = parsed.data;
-  const { error: delError } = await supabase
+  // Insert the new week first and only then remove the old rows, so a failed save never leaves the
+  // branch with no hours (which would block all booking). At worst a failed delete leaves both sets.
+  const { data: previous, error: readError } = await supabase
     .from("clinic_hours")
-    .delete()
+    .select("id")
     .eq("clinic_id", ctx.clinicId)
     .eq("branch_id", branchId);
-  if (delError) return { message: "We could not save the hours." };
+  if (readError) return { message: "We could not save the hours." };
   const rows = parsed.data.days
     .filter((d) => d.open)
     .map((d) => ({
@@ -141,6 +143,16 @@ export async function saveHoursAction(
   if (rows.length > 0) {
     const { error } = await supabase.from("clinic_hours").insert(rows);
     if (error) return { message: "We could not save the hours." };
+  }
+  const oldIds = (previous ?? []).map((row) => String((row as { id: unknown }).id));
+  if (oldIds.length > 0) {
+    const { error: delError } = await supabase
+      .from("clinic_hours")
+      .delete()
+      .eq("clinic_id", ctx.clinicId)
+      .eq("branch_id", branchId)
+      .in("id", oldIds);
+    if (delError) return { message: "We could not save the hours. Please try again." };
   }
   await logAudit(supabase, ctx.clinicId, "hours.updated", "branch", branchId);
   revalidatePath("/settings/branches");

@@ -84,4 +84,37 @@ describe("ConversationList", () => {
     );
     expect(screen.queryByText("Previous")).not.toBeInTheDocument();
   });
+
+  it("replaces first-page rows on refresh so a resolved conversation does not keep a stale chip", () => {
+    const item = (id: string, status: "open" | "needs_human" | "resolved") => ({
+      id,
+      status,
+      handledBy: "ai" as const,
+      label: `Chat ${id}`,
+      time: "9:00 AM",
+      preview: "hello",
+    });
+    const { rerender } = render(
+      <ConversationList
+        initialItems={[item("a", "needs_human"), item("b", "open")]}
+        initialTotal={2}
+        filter="all"
+      />,
+    );
+    expect(screen.getByText("Needs a human")).toBeInTheDocument();
+    rerender(
+      <ConversationList
+        initialItems={[item("a", "resolved"), item("b", "open")]}
+        initialTotal={2}
+        filter="all"
+      />,
+    );
+    expect(screen.queryByText("Needs a human")).toBeNull();
+    expect(screen.getByText("Resolved")).toBeInTheDocument();
+    // Dropped from a filtered first page: the row disappears instead of lingering.
+    rerender(
+      <ConversationList initialItems={[item("b", "open")]} initialTotal={1} filter="needs" />,
+    );
+    expect(screen.queryByText("Chat a")).toBeNull();
+  });
 });

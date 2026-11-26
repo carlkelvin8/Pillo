@@ -29,13 +29,28 @@ describe("Gemini model adapter", () => {
       messages: [{ role: "user", content: "What are the hours and phone?" }],
     });
 
-    expect(create).toHaveBeenCalledWith({
-      model: "gemini-test",
-      system_instruction: "Be concise.",
-      tools: [{ type: "function", name: "lookup", description: "Read a fixture", parameters: { type: "object" } }],
-      input: [{ type: "user_input", content: [{ type: "text", text: "What are the hours and phone?" }] }],
-      store: false,
-    }, GEMINI_REQUEST_OPTIONS);
+    expect(create).toHaveBeenCalledWith(
+      {
+        model: "gemini-test",
+        system_instruction: "Be concise.",
+        tools: [
+          {
+            type: "function",
+            name: "lookup",
+            description: "Read a fixture",
+            parameters: { type: "object" },
+          },
+        ],
+        input: [
+          {
+            type: "user_input",
+            content: [{ type: "text", text: "What are the hours and phone?" }],
+          },
+        ],
+        store: false,
+      },
+      GEMINI_REQUEST_OPTIONS,
+    );
     expect(response).toEqual({
       text: "Checking details.",
       toolCalls: [
@@ -48,7 +63,9 @@ describe("Gemini model adapter", () => {
 
   it("sends previous function calls and their results as stateless interaction steps", async () => {
     const create = vi.fn().mockResolvedValue({
-      steps: [{ type: "model_output", content: [{ type: "text", text: "The clinic is open weekdays." }] }],
+      steps: [
+        { type: "model_output", content: [{ type: "text", text: "The clinic is open weekdays." }] },
+      ],
     });
     const call = createGeminiModelCall({
       apiKey: "test-key",
@@ -68,19 +85,39 @@ describe("Gemini model adapter", () => {
         },
         {
           role: "tool",
-          toolResults: [{ callId: "call-1", name: "get_clinic_info", content: "{\"hours\":\"weekdays\"}", isError: false }],
+          toolResults: [
+            {
+              callId: "call-1",
+              name: "get_clinic_info",
+              content: '{"hours":"weekdays"}',
+              isError: false,
+            },
+          ],
         },
       ],
     });
 
-    expect(create).toHaveBeenCalledWith(expect.objectContaining({
-      input: [
-        { type: "user_input", content: [{ type: "text", text: "What are the hours?" }] },
-        { type: "function_call", id: "call-1", name: "get_clinic_info", arguments: {} },
-        { type: "function_result", call_id: "call-1", name: "get_clinic_info", result: "{\"hours\":\"weekdays\"}", is_error: false },
-      ],
-    }), GEMINI_REQUEST_OPTIONS);
-    expect(response).toMatchObject({ text: "The clinic is open weekdays.", toolCalls: [], stopReason: "end" });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: [
+          { type: "user_input", content: [{ type: "text", text: "What are the hours?" }] },
+          { type: "function_call", id: "call-1", name: "get_clinic_info", arguments: {} },
+          {
+            type: "function_result",
+            call_id: "call-1",
+            name: "get_clinic_info",
+            result: '{"hours":"weekdays"}',
+            is_error: false,
+          },
+        ],
+      }),
+      GEMINI_REQUEST_OPTIONS,
+    );
+    expect(response).toMatchObject({
+      text: "The clinic is open weekdays.",
+      toolCalls: [],
+      stopReason: "end",
+    });
   });
 
   it("does not return malformed function arguments as trusted input", async () => {

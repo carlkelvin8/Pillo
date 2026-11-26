@@ -8,7 +8,7 @@ describe("getDemoVoiceLine", () => {
   });
 
   it("rejects free-form text and unknown IDs", () => {
-    expect(getDemoVoiceLine("Patient Maria has an appointment" )).toBeNull();
+    expect(getDemoVoiceLine("Patient Maria has an appointment")).toBeNull();
     expect(getDemoVoiceLine("unknown")).toBeNull();
   });
 });

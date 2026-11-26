@@ -29,9 +29,10 @@ export function ClinicLogoForm({ clinicName, logoUrl }: Props) {
     return () => URL.revokeObjectURL(preview);
   }, [preview]);
 
-  // After a saved upload or removal, show the stored state and reset the picker.
+  // After any finished upload or removal (saved or rejected), reset the picker. React also clears
+  // the file input after a form action, so a leftover preview would offer an upload with no file.
   useEffect(() => {
-    if (!state.ok && !removeState.ok) return;
+    if (!state.message && !removeState.message) return;
     setPreview(null);
     setClientError(null);
     if (input.current) input.current.value = "";

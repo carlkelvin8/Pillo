@@ -38,7 +38,11 @@ export type OfferLocation = {
 
 export type OfferView =
   | { state: "invalid" }
-  | { state: Exclude<OfferState, "open" | "accepted">; clinicName: string }
+  | {
+      state: Exclude<OfferState, "open" | "accepted">;
+      clinicName: string;
+      status: OfferRecord["status"];
+    }
   | ({ state: "accepted"; clinicName: string } & OfferLocation)
   | ({
       state: "open";
@@ -131,7 +135,8 @@ export async function viewOffer(
     clinicOf(svc, o.clinic_id),
     state === "open" || state === "accepted" ? branchOf(svc, o) : null,
   ]);
-  if (state === "closed" || state === "expired") return { state, clinicName: clinic.name };
+  if (state === "closed" || state === "expired")
+    return { state, clinicName: clinic.name, status: o.status };
   const location: OfferLocation = { branch, websiteUrl: clinic.websiteUrl };
   if (state === "accepted") return { state, clinicName: clinic.name, ...location };
   const [{ data: d }, { data: p }] = await Promise.all([

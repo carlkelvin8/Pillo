@@ -19,39 +19,78 @@ async function owner() {
   return { clinicId: ws.membership.clinic.id, userId: ws.user.id };
 }
 
-export async function createMcpTokenAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function createMcpTokenAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const ctx = await owner();
   if (!ctx) return DENIED;
-  const parsed = z.object({
-    name: z.string().trim().min(1).max(80),
-    scopes: z.array(z.enum(MCP_SCOPES)).max(MCP_SCOPES.length),
-    expiresInDays: z.coerce.number().pipe(z.union(MCP_EXPIRY_DAYS.map((d) => z.literal(d)) as [z.ZodLiteral<number>, z.ZodLiteral<number>, z.ZodLiteral<number>])),
-  }).safeParse({ name: formString(formData, "name"), scopes: formData.getAll("scopes").map(String), expiresInDays: formString(formData, "expiresInDays") || "90" });
+  const parsed = z
+    .object({
+      name: z.string().trim().min(1).max(80),
+      scopes: z.array(z.enum(MCP_SCOPES)).max(MCP_SCOPES.length),
+      expiresInDays: z.coerce
+        .number()
+        .pipe(
+          z.union(
+            MCP_EXPIRY_DAYS.map((d) => z.literal(d)) as [
+              z.ZodLiteral<number>,
+              z.ZodLiteral<number>,
+              z.ZodLiteral<number>,
+            ],
+          ),
+        ),
+    })
+    .safeParse({
+      name: formString(formData, "name"),
+      scopes: formData.getAll("scopes").map(String),
+      expiresInDays: formString(formData, "expiresInDays") || "90",
+    });
   if (!parsed.success) return { message: "Enter a name and choose valid scopes." };
   const token = newToken();
   const supabase = await createClient();
-  const { data, error } = await supabase.from("mcp_tokens").insert({
-    clinic_id: ctx.clinicId,
-    name: parsed.data.name,
-    token_hash: hashToken(token),
-    scopes: parsed.data.scopes,
-    expires_at: expiryFromChoice(parsed.data.expiresInDays).toISOString(),
-    created_by: ctx.userId,
-  }).select("id").maybeSingle();
+  const { data, error } = await supabase
+    .from("mcp_tokens")
+    .insert({
+      clinic_id: ctx.clinicId,
+      name: parsed.data.name,
+      token_hash: hashToken(token),
+      scopes: parsed.data.scopes,
+      expires_at: expiryFromChoice(parsed.data.expiresInDays).toISOString(),
+      created_by: ctx.userId,
+    })
+    .select("id")
+    .maybeSingle();
   if (error || !data) return { message: "We could not create that token." };
-  await logAudit(supabase, ctx.clinicId, "mcp.token_created", "mcp_token", data.id, { scopes: parsed.data.scopes.join(","), expiresInDays: parsed.data.expiresInDays });
+  await logAudit(supabase, ctx.clinicId, "mcp.token_created", "mcp_token", data.id, {
+    scopes: parsed.data.scopes.join(","),
+    expiresInDays: parsed.data.expiresInDays,
+  });
   revalidatePath("/integrations");
-  return { ok: true, message: "Token created. Copy it now; it will not be shown again.", data: { token } };
+  return {
+    ok: true,
+    message: "Token created. Copy it now; it will not be shown again.",
+    data: { token },
+  };
 }
 
-export async function revokeMcpTokenAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function revokeMcpTokenAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const ctx = await owner();
   if (!ctx) return DENIED;
   const id = z.uuid().safeParse(formString(formData, "tokenId"));
   if (!id.success) return { message: "Token not found." };
   const supabase = await createClient();
-  const { data, error } = await supabase.from("mcp_tokens").update({ revoked_at: new Date().toISOString() })
-    .eq("id", id.data).eq("clinic_id", ctx.clinicId).is("revoked_at", null).select("id").maybeSingle();
+  const { data, error } = await supabase
+    .from("mcp_tokens")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", id.data)
+    .eq("clinic_id", ctx.clinicId)
+    .is("revoked_at", null)
+    .select("id")
+    .maybeSingle();
   if (error || !data) return { message: "Token was already revoked or could not be found." };
   await logAudit(supabase, ctx.clinicId, "mcp.token_revoked", "mcp_token", id.data);
   revalidatePath("/integrations");

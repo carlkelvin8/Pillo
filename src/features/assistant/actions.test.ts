@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { sendStaffMessageAction } from "./actions";
+import { handBackAction, resolveConversationAction, sendStaffMessageAction } from "./actions";
 
 const mock = vi.hoisted(() => ({
   getWorkspace: vi.fn(),
@@ -108,4 +108,77 @@ it("reports a failed takeover after the reply was stored", async () => {
   const result = await sendStaffMessageAction({}, form);
   expect(result.ok).toBeUndefined();
   expect(result.message).toContain("could not take over the chat");
+});
+
+const CONVO = "a0b1c2d3-1234-4123-8123-120000000001";
+const CLINIC = "a0b1c2d3-1234-4123-8123-120000000000";
+
+function conversationClient(rows: unknown[]) {
+  const update = vi.fn();
+  const rpc = vi.fn().mockResolvedValue({ error: null });
+  const chain = {
+    eq: vi.fn(() => chain),
+    select: vi.fn(async () => ({ data: rows, error: null })),
+  };
+  update.mockReturnValue(chain);
+  mock.createClient.mockResolvedValue({ from: () => ({ update }), rpc });
+  return { update, rpc };
+}
+
+it.each([
+  ["hand back", handBackAction, { handled_by: "ai", status: "open" }, "conversation.handed_back"],
+  ["resolve", resolveConversationAction, { status: "resolved" }, "conversation.resolved"],
+] as const)(
+  "%s updates the conversation and writes an audit entry",
+  async (_n, action, patch, audit) => {
+    mock.getWorkspace.mockResolvedValue({
+      membership: { role: "receptionist", clinic: { id: CLINIC } },
+    });
+    const { update, rpc } = conversationClient([{ id: CONVO }]);
+    const form = new FormData();
+    form.set("conversationId", CONVO);
+    await expect(action({}, form)).resolves.toEqual({ ok: true });
+    expect(update).toHaveBeenCalledWith(patch);
+    expect(rpc).toHaveBeenCalledWith(
+      "log_audit",
+      expect.objectContaining({ p_action: audit, p_entity_id: CONVO }),
+    );
+  },
+);
+
+it("refuses inbox writes for a doctor and reports a conversation that is not in the clinic", async () => {
+  const form = new FormData();
+  form.set("conversationId", CONVO);
+  form.set("message", "hello");
+  mock.getWorkspace.mockResolvedValue({ membership: { role: "doctor", clinic: { id: CLINIC } } });
+  const { update } = conversationClient([]);
+  for (const action of [handBackAction, resolveConversationAction, sendStaffMessageAction])
+    await expect(action({}, form)).resolves.toEqual({
+      message: "You do not have permission to do that.",
+    });
+  expect(update).not.toHaveBeenCalled();
+
+  mock.getWorkspace.mockResolvedValue({ membership: { role: "owner", clinic: { id: CLINIC } } });
+  conversationClient([]);
+  await expect(resolveConversationAction({}, form)).resolves.toEqual({
+    message: "We could not update that conversation.",
+  });
+  const bad = new FormData();
+  bad.set("conversationId", "not-a-uuid");
+  await expect(resolveConversationAction({}, bad)).resolves.toEqual({
+    message: "Invalid conversation.",
+  });
+});
+
+it("rejects an empty or oversized staff reply before touching the database", async () => {
+  mock.getWorkspace.mockResolvedValue({ membership: { role: "owner", clinic: { id: CLINIC } } });
+  mock.createClient.mockClear();
+  for (const message of ["   ", "x".repeat(1001)]) {
+    const form = new FormData();
+    form.set("conversationId", CONVO);
+    form.set("message", message);
+    const result = await sendStaffMessageAction({}, form);
+    expect(result.fieldErrors?.message?.length).toBeGreaterThan(0);
+  }
+  expect(mock.createClient).not.toHaveBeenCalled();
 });

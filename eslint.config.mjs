@@ -13,6 +13,7 @@ const config = [
   {
     ignores: [
       ".next/**",
+      ".next-prod/**",
       "node_modules/**",
       "docs/**",
       "supabase/functions/**",

@@ -27,11 +27,25 @@ export async function importPatientsCsvAction(_prev: ActionState, formData: Form
   catch (error) { return { message: error instanceof Error ? error.message : "Invalid CSV." }; }
   if (!parsed.rows.length) return { message: `No valid rows to import (${parsed.errors.length} have errors).` };
   const supabase = await createClient();
-  const { data, error } = await supabase.from("patients").insert(parsed.rows.map((row) => ({ clinic_id: ws.membership!.clinic.id, ...row }))).select("id");
+  const clinicId = ws.membership.clinic.id;
+  // Skip repeats: the same name and phone twice in the file, or a patient the clinic already has.
+  const key = (name: string, phone: string | null) => `${name.trim().toLowerCase()}|${(phone ?? "").replace(/\s+/g, "")}`;
+  const names = [...new Set(parsed.rows.map((row) => row.full_name))];
+  const { data: existing } = await supabase.from("patients").select("full_name, phone").eq("clinic_id", clinicId).in("full_name", names);
+  const seen = new Set(((existing ?? []) as { full_name: string; phone: string | null }[]).map((p) => key(p.full_name, p.phone)));
+  const fresh = parsed.rows.filter((row) => {
+    const k = key(row.full_name, row.phone);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  const duplicates = parsed.rows.length - fresh.length;
+  if (!fresh.length) return { message: `Nothing to import: all ${duplicates} valid rows are already in your patient list.` };
+  const { data, error } = await supabase.from("patients").insert(fresh.map((row) => ({ clinic_id: clinicId, ...row }))).select("id");
   if (error || !data) return { message: "We could not import the patients. No rows were confirmed." };
-  await logAudit(supabase, ws.membership.clinic.id, "patient.imported", "patient_import", null, { imported: data.length, rejected: parsed.errors.length, total: parsed.total });
+  await logAudit(supabase, clinicId, "patient.imported", "patient_import", null, { imported: data.length, rejected: parsed.errors.length, duplicates, total: parsed.total });
   revalidatePath("/patients");
-  return { ok: true, message: `Imported ${data.length} patients; ${parsed.errors.length} rows skipped.` };
+  return { ok: true, message: `Imported ${data.length} patients; ${parsed.errors.length} rows with errors and ${duplicates} duplicates skipped.` };
 }
 
 function patientInput(formData: FormData) {

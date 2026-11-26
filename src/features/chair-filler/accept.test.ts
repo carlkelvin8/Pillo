@@ -199,4 +199,30 @@ describe("viewOffer / declineOffer", () => {
     await declineOffer(g.svc, TOKEN, NOW);
     expect(has(g.calls, "slot_offers", "update")).toBe(false);
   });
+
+  it("reports the real reason an offer is closed or expired", async () => {
+    const declined = await viewOffer(
+      fake({ offer: offer({ status: "declined" }) }).svc,
+      TOKEN,
+      NOW,
+    );
+    expect(declined).toMatchObject({ state: "closed", status: "declined" });
+    const skipped = await viewOffer(fake({ offer: offer({ status: "skipped" }) }).svc, TOKEN, NOW);
+    expect(skipped).toMatchObject({ state: "closed", status: "skipped" });
+    const past = await viewOffer(
+      fake({ offer: offer({ expires_at: "2027-01-13T00:00:00Z" }) }).svc,
+      TOKEN,
+      NOW,
+    );
+    expect(past).toMatchObject({ state: "expired" });
+    const taken = await viewOffer(fake({ offer: offer({ status: "expired" }) }).svc, TOKEN, NOW);
+    expect(taken).toMatchObject({ state: "closed", status: "expired" });
+  });
+  it("books once when the link is submitted twice (second claim loses)", async () => {
+    const first = fake({ offer: offer() });
+    expect(await acceptOffer(first.svc, TOKEN, NOW)).toBe("accepted");
+    const second = fake({ offer: offer({ status: "accepted" }) });
+    expect(await acceptOffer(second.svc, TOKEN, NOW)).toBe("closed");
+    expect(has(second.calls, "appointments", "insert")).toBe(false);
+  });
 });

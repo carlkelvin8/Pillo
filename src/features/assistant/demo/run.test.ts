@@ -37,11 +37,13 @@ describe("local synthetic Gemini demo", () => {
     });
     expect(result).toEqual({ reply: "Open Monday to Friday, 9 AM to 5 PM.", steps: 1 });
     expect(modelCall).toHaveBeenCalledTimes(1);
-    expect(modelCall).toHaveBeenCalledWith(expect.objectContaining({
-      tools: [],
-      messages: [{ role: "user", content: "What are the clinic hours?" }],
-      system: expect.stringContaining("Demo Family Dental"),
-    }));
+    expect(modelCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tools: [],
+        messages: [{ role: "user", content: "What are the clinic hours?" }],
+        system: expect.stringContaining("Demo Family Dental"),
+      }),
+    );
     expect(JSON.stringify(modelCall.mock.calls[0]?.[0])).toContain("123 Sampaguita Street");
   });
 
@@ -90,7 +92,9 @@ describe("local synthetic Gemini demo", () => {
   it("retries once when the SDK request times out", async () => {
     env.NODE_ENV = "development";
     modelCall
-      .mockRejectedValueOnce(Object.assign(new Error("timed out"), { name: "APIConnectionTimeoutError" }))
+      .mockRejectedValueOnce(
+        Object.assign(new Error("timed out"), { name: "APIConnectionTimeoutError" }),
+      )
       .mockResolvedValueOnce({ text: "Open weekdays.", stopReason: "end", toolCalls: [] });
 
     const result = await runGeminiDemo({

@@ -62,6 +62,7 @@ export async function runGeminiDemo(options: {
     messages: [{ role: "user", content: options.question }],
   });
   const reply = result.text.trim();
-  if (!reply || result.stopReason !== "end") throw new Error("Gemini returned no synthetic FAQ answer.");
+  if (!reply || result.stopReason !== "end")
+    throw new Error("Gemini returned no synthetic FAQ answer.");
   return { reply, steps: 1 };
 }
