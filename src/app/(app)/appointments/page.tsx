@@ -184,7 +184,7 @@ export default async function AppointmentsPage({ searchParams }: Props) {
           branchId: a.branch_id,
           branchName: branchNameById.get(a.branch_id) ?? "",
           dateLabel: `${formatWeekday(d)} ${formatDateLong(d)}`,
-          timeLabel: `${formatTime(a.starts_at, tz)} – ${formatTime(a.ends_at, tz)}`,
+          timeLabel: `${formatTime(a.starts_at, tz)} to ${formatTime(a.ends_at, tz)}`,
           durationMin: Math.round(
             (new Date(a.ends_at).getTime() - new Date(a.starts_at).getTime()) / 60_000,
           ),

@@ -196,7 +196,7 @@ export default async function InvoicesPage({ searchParams }: Props) {
           className="flex flex-wrap items-center justify-between gap-3 px-2 pb-2"
         >
           <span className="tabular text-muted text-sm">
-            Showing {total === 0 ? 0 : (page - 1) * INVOICE_PAGE_SIZE + 1}–
+            Showing {total === 0 ? 0 : (page - 1) * INVOICE_PAGE_SIZE + 1} to{" "}
             {Math.min(page * INVOICE_PAGE_SIZE, total)} of {total} · {INVOICE_PAGE_SIZE} per page
           </span>
           <div className="flex items-center gap-2">

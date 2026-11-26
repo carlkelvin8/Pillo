@@ -146,8 +146,8 @@ export function formatWeekRange(start: string, endInclusive: string): string {
   const month = (d: Date) =>
     new Intl.DateTimeFormat("en-PH", { month: "long", timeZone: "UTC" }).format(d);
   return s.getUTCMonth() === e.getUTCMonth()
-    ? `${s.getUTCDate()} – ${e.getUTCDate()} ${month(e)}`
-    : `${s.getUTCDate()} ${month(s)} – ${e.getUTCDate()} ${month(e)}`;
+    ? `${s.getUTCDate()} to ${e.getUTCDate()} ${month(e)}`
+    : `${s.getUTCDate()} ${month(s)} to ${e.getUTCDate()} ${month(e)}`;
 }
 
 /** "09:00:00" | "09:00" -> "09:00" */

@@ -187,7 +187,7 @@ export default async function PaymentsPage({ searchParams }: Props) {
           className="border-line flex flex-wrap items-center justify-between gap-3 border-t pt-4"
         >
           <span className="text-muted text-sm">
-            Showing {total === 0 ? 0 : (page - 1) * TRANSACTION_PAGE_SIZE + 1}–
+            Showing {total === 0 ? 0 : (page - 1) * TRANSACTION_PAGE_SIZE + 1} to{" "}
             {Math.min(page * TRANSACTION_PAGE_SIZE, total)} of {total} · {TRANSACTION_PAGE_SIZE} per
             page
           </span>
