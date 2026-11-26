@@ -10,4 +10,20 @@ describe("ClinicIdentity", () => {
     expect(screen.getByText("CURRENT CLINIC")).toBeInTheDocument();
     expect(screen.getByText("QA Dental Clinic")).toHaveAttribute("title", "QA Dental Clinic");
   });
+
+  it("shows the first letter when there is no logo", () => {
+    const { container } = render(<ClinicIdentity clinicName="dental clinic" />);
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.getByText("D")).toBeInTheDocument();
+  });
+
+  it("shows the uploaded logo instead of the letter", () => {
+    const { container } = render(
+      <ClinicIdentity clinicName="Dental Clinic" logoUrl="https://example.test/logo.png" />,
+    );
+    const img = container.querySelector("img");
+    expect(img).toHaveAttribute("src", "https://example.test/logo.png");
+    expect(img).toHaveAttribute("alt", "");
+    expect(screen.queryByText("D")).toBeNull();
+  });
 });

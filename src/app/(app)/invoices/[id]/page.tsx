@@ -15,6 +15,8 @@ import {
   SendInvoiceButton,
   VoidInvoiceButton,
 } from "@/features/invoices/components/invoice-actions";
+import { onlinePaymentsEnabled } from "@/config/features";
+import { OnlinePaymentsSoon } from "@/features/payments/components/online-payments-soon";
 import { amountPaid, getInvoice } from "@/features/invoices/queries";
 import { DraftInvoiceEditor } from "@/features/invoices/components/draft-invoice-editor";
 import { ShareInvoiceMessage } from "@/features/invoices/components/share-invoice-message";
@@ -63,7 +65,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     if (p.status === "succeeded" && p.paid_at)
       timeline.push({
         at: p.paid_at,
-        label: `Payment received${p.method ? ` · ${METHOD_LABEL[p.method]}` : ""} · ${formatPHP(p.amount_centavos)}`,
+        label: `Payment recorded${p.method ? ` · ${METHOD_LABEL[p.method]}` : ""} · ${formatPHP(p.amount_centavos)}`,
       });
     else if (p.status === "pending")
       timeline.push({ at: p.created_at, label: "Payment link created" });
@@ -203,7 +205,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         <div className="flex min-w-0 flex-col gap-6">
           <Card aria-labelledby="invoice-payment" className="flex flex-col gap-4 p-4 sm:p-6">
             <h2 id="invoice-payment" className="text-card-title">
-              Payment
+              Payment record
             </h2>
             {paid > 0 ? (
               <section aria-label="Payment receipt" className="rounded-control bg-mint p-4">
@@ -275,11 +277,20 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                 <CancelLinkButton paymentId={openLink.id} invoiceId={invoice.id} />
               </div>
             ) : null}
-            {canCollect && !openLink && due > 0 ? (
-              <RequestPaymentButton invoiceId={invoice.id} />
-            ) : null}
             {canCollect && due > 0 ? (
-              <RecordPaymentDialog invoiceId={invoice.id} dueLabel={formatPHP(due)} />
+              <RecordPaymentDialog
+                primary
+                invoiceId={invoice.id}
+                dueLabel={formatPHP(due)}
+                today={todayIn(tz)}
+              />
+            ) : null}
+            {canCollect && !openLink && due > 0 ? (
+              onlinePaymentsEnabled() ? (
+                <RequestPaymentButton invoiceId={invoice.id} />
+              ) : (
+                <OnlinePaymentsSoon compact />
+              )
             ) : null}
             {invoice.status === "draft" ? <SendInvoiceButton invoiceId={invoice.id} /> : null}
             {canCollect && paid === 0 ? <VoidInvoiceButton invoiceId={invoice.id} /> : null}

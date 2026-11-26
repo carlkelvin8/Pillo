@@ -8,6 +8,7 @@ import { can } from "@/features/auth/permissions";
 import { getWorkspace } from "@/features/auth/workspace";
 import { clinicDetailsSchema, clinicProfileSchema } from "@/features/clinic/schemas";
 import { echo, formString, validationFailed, type ActionState } from "@/lib/action-state";
+import { LOGO_BUCKET, LOGO_MAX_BYTES, LOGO_TYPES, sniffImageType } from "@/features/clinic/logo";
 import { createClient } from "@/lib/supabase/server";
 
 const DETAIL_KEYS = ["name", "address", "phone", "email"] as const;
@@ -145,4 +146,56 @@ export async function completeOnboardingAction(): Promise<void> {
   );
   revalidatePath("/", "layout");
   redirect("/dashboard");
+}
+
+/** Settings > Clinic profile: upload the clinic logo (owners only; png, jpeg or webp up to 1 MB). */
+export async function uploadClinicLogoAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const ws = await getWorkspace();
+  if (!ws?.membership || ws.membership.role !== "owner") return DENIED;
+
+  const file = formData.get("logo");
+  if (!(file instanceof File) || file.size === 0) return { message: "Choose an image first." };
+  if (file.size > LOGO_MAX_BYTES) return { message: "The logo must be 1 MB or smaller." };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const type = sniffImageType(bytes);
+  if (!type) return { message: "Use a PNG, JPG or WebP image." };
+
+  const clinic = ws.membership.clinic;
+  const path = `${clinic.id}/logo-${Date.now()}.${LOGO_TYPES[type]}`;
+  const supabase = await createClient();
+  const upload = await supabase.storage
+    .from(LOGO_BUCKET)
+    .upload(path, bytes, { contentType: type, cacheControl: "31536000" });
+  if (upload.error) return { message: "We could not upload the logo. Please try again." };
+
+  const { data, error } = await supabase
+    .from("clinics")
+    .update({ logo_path: path })
+    .eq("id", clinic.id)
+    .select("id");
+  if (error || !data?.length) {
+    await supabase.storage.from(LOGO_BUCKET).remove([path]);
+    return { message: "We could not save the logo." };
+  }
+  if (clinic.logo_path) await supabase.storage.from(LOGO_BUCKET).remove([clinic.logo_path]);
+
+  await logAudit(supabase, clinic.id, "clinic.logo_updated", "clinic", clinic.id);
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Logo updated." };
+}
+
+export async function removeClinicLogoAction(): Promise<ActionState> {
+  const ws = await getWorkspace();
+  if (!ws?.membership || ws.membership.role !== "owner") return DENIED;
+  const clinic = ws.membership.clinic;
+  const supabase = await createClient();
+  const { error } = await supabase.from("clinics").update({ logo_path: null }).eq("id", clinic.id);
+  if (error) return { message: "We could not remove the logo." };
+  if (clinic.logo_path) await supabase.storage.from(LOGO_BUCKET).remove([clinic.logo_path]);
+  await logAudit(supabase, clinic.id, "clinic.logo_removed", "clinic", clinic.id);
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Logo removed." };
 }

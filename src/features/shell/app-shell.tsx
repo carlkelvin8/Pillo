@@ -13,11 +13,12 @@ type AppShellProps = {
   user: { name: string | null; email: string };
   role: Role;
   clinicName: string;
+  logoUrl?: string | null;
   children: ReactNode;
 };
 
 /** Sidebar (240-272px, collapsible to 72px) + top bar (search, notifications) + page content. */
-export function AppShell({ user, role, clinicName, children }: AppShellProps) {
+export function AppShell({ user, role, clinicName, logoUrl = null, children }: AppShellProps) {
   const groups = navForRole(role);
   const sidebarHeader = (
     <div className="flex flex-col gap-3 px-1">
@@ -28,7 +29,7 @@ export function AppShell({ user, role, clinicName, children }: AppShellProps) {
       >
         <Logo className="[&_svg]:size-10" />
       </Link>
-      <ClinicIdentity clinicName={clinicName} />
+      <ClinicIdentity clinicName={clinicName} logoUrl={logoUrl} />
     </div>
   );
   const sidebarBody = (

@@ -89,7 +89,7 @@ export function AddToWaitlistDialog({ doctors }: { doctors: DoctorOption[] }) {
       title="Add to waitlist"
       description="Patients who want an earlier slot."
       trigger={
-        <Button variant="mint" className="min-h-10 px-3">
+        <Button variant="mint" className="px-3">
           <Plus aria-hidden="true" /> Add
         </Button>
       }
@@ -106,7 +106,7 @@ export function WaitlistRemoveButton({ entryId, name }: { entryId: string; name:
       <input type="hidden" name="entryId" value={entryId} />
       <SubmitButton
         variant="ghost"
-        className="min-h-9 px-3 text-xs"
+        className="px-3 text-xs"
         pendingLabel="Removing…"
         aria-label={`Remove ${name} from the waitlist`}
       >

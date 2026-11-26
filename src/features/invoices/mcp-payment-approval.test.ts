@@ -19,6 +19,10 @@ vi.mock("./queries", () => ({ getInvoice: mock.getInvoice, amountPaid: mock.amou
 
 import { requestPaymentAction } from "./actions";
 
+beforeEach(() => {
+  vi.stubEnv("ONLINE_PAYMENTS_ENABLED", "true");
+});
+
 const invoiceId = "11111111-1111-4111-8111-111111111111";
 const requestId = "22222222-2222-4222-8222-222222222222";
 

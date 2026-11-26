@@ -158,7 +158,7 @@ export function DrPillSkillsLab({ demoAvailable }: { demoAvailable: boolean }) {
         {turns.length === 1 ? (
           <div className="flex flex-wrap gap-2" aria-label="Suggested prompts">
             {STARTERS.map((starter) => (
-              <Button key={starter.label} variant="ghost" className="min-h-10 text-xs" onClick={() => answer(starter.skill, starter.prompt)}>
+              <Button key={starter.label} variant="ghost" className="text-xs" onClick={() => answer(starter.skill, starter.prompt)}>
                 {starter.label}
               </Button>
             ))}

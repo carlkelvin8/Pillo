@@ -1,17 +1,13 @@
-import Link from "next/link";
-import { DrPillAvatar } from "@/components/brand/dr-pill-avatar";
-import { Button } from "@/components/ui/button";
+import type { Metadata } from "next";
 import { APP_NAME } from "@/config/brand";
+import { Landing } from "@/features/marketing/landing";
+
+export const metadata: Metadata = {
+  title: { absolute: `${APP_NAME} · Clinic management and AI front desk` },
+  description:
+    "Appointments, patient records, payment records and a supervised AI front desk for Philippine clinics.",
+};
 
 export default function HomePage() {
-  return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center gap-6 px-6 text-center">
-      <DrPillAvatar mood="happy" size={128} />
-      <h1 className="text-title">{APP_NAME}</h1>
-      <p className="text-muted">Phase 0 scaffold. The product screens arrive in later phases.</p>
-      <Button asChild>
-        <Link href="/styleguide">Open the styleguide</Link>
-      </Button>
-    </main>
-  );
+  return <Landing />;
 }

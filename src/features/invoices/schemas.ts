@@ -71,8 +71,15 @@ export const invoiceFormSchema = z
 
 export const recordPaymentSchema = z.object({
   invoiceId: z.uuid(),
-  method: z.enum(["cash", "bank"]),
+  method: z.enum(["cash", "bank", "gcash", "maya"]),
   amount: pesos("Amount").refine((c) => c > 0, "Enter the amount received."),
+  /** Clinic-local "YYYY-MM-DD" the money was received; blank means today. */
+  receivedOn: z
+    .string()
+    .trim()
+    .transform((v) => (v === "" ? undefined : v))
+    .refine((v) => v === undefined || /^\d{4}-\d{2}-\d{2}$/.test(v), "Pick a valid date.")
+    .optional(),
   reference: z
     .string()
     .trim()

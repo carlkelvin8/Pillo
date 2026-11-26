@@ -16,7 +16,7 @@ const membershipRowSchema = z.object({
 });
 
 const CLINIC_COLUMNS =
-  "id, name, address, phone, email, timezone, assistant_settings, onboarding_completed_at";
+  "id, name, address, phone, email, timezone, logo_path, assistant_settings, onboarding_completed_at";
 
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const supabase = await createClient();

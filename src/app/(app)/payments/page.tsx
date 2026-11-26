@@ -4,10 +4,10 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
 import { requireCapability } from "@/features/auth/workspace";
-import { BalanceHero } from "@/features/payments/components/balance-hero";
+import { OnlinePaymentsSoon } from "@/features/payments/components/online-payments-soon";
+import { RecordedHero } from "@/features/payments/components/recorded-hero";
 import {
   collectionsData,
-  getBalance,
   listTransactions,
   methodLabel,
   TRANSACTION_PAGE_SIZE,
@@ -44,12 +44,20 @@ export default async function PaymentsPage({ searchParams }: Props) {
   const tz = membership.clinic.timezone;
   const today = todayIn(tz);
 
-  const sinceIso = zonedToUtcIso(addDays(today, -29), "00:00", tz);
-  const [balance, { items, total }, mix] = await Promise.all([
-    getBalance(clinicId),
+  const monthStart = `${today.slice(0, 8)}01`;
+  const rangeStart = addDays(today, -29) < monthStart ? addDays(today, -29) : monthStart;
+  const sinceIso = zonedToUtcIso(rangeStart, "00:00", tz);
+  const [{ items, total }, collections] = await Promise.all([
     listTransactions(clinicId, { page, filter }),
     collectionsData(clinicId, sinceIso, tz),
   ]);
+  const last30 = addDays(today, -29);
+  const rows = collections.rows.filter((r) => dateOf(r.paid_at, tz) >= last30);
+  const byMethod = new Map<string, number>();
+  for (const r of rows) byMethod.set(r.method, (byMethod.get(r.method) ?? 0) + r.amount_centavos);
+  const mix = { rows, byMethod };
+  const monthRows = collections.rows.filter((r) => dateOf(r.paid_at, tz) >= monthStart);
+  const recordedThisMonth = monthRows.reduce((a, r) => a + r.amount_centavos, 0);
   const totalMix = [...mix.byMethod.values()].reduce((a, b) => a + b, 0);
   const pages = Math.max(1, Math.ceil(total / TRANSACTION_PAGE_SIZE));
   const href = (f: Filter, p: number) => {
@@ -61,20 +69,20 @@ export default async function PaymentsPage({ searchParams }: Props) {
 
   return (
     <>
-      <PageHeader eyebrow="Money" title="Payments" />
+      <PageHeader eyebrow="Money" title="Payment records" />
       <div className="grid items-stretch gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <BalanceHero centavos={balance} />
+        <RecordedHero centavos={recordedThisMonth} count={monthRows.length} />
         <Card className="flex flex-col gap-4">
           <div>
             <CardTitle>Collections</CardTitle>
-            <p className="text-muted mt-1 text-sm">Last 30 days</p>
+            <p className="text-muted mt-1 text-sm">Recorded in the last 30 days</p>
           </div>
           <div>
             <p className="tabular text-2xl font-semibold tracking-tight">{formatPHP(totalMix)}</p>
             <p className="text-muted text-sm">
               {mix.rows.length === 0
-                ? "No successful payments in this period."
-                : `${mix.rows.length} successful ${mix.rows.length === 1 ? "payment" : "payments"}`}
+                ? "No payments recorded in this period."
+                : `${mix.rows.length} recorded ${mix.rows.length === 1 ? "payment" : "payments"}`}
             </p>
           </div>
           {totalMix > 0 ? (
@@ -106,6 +114,7 @@ export default async function PaymentsPage({ searchParams }: Props) {
               </ul>
             </>
           ) : null}
+          <OnlinePaymentsSoon />
         </Card>
       </div>
 
@@ -130,7 +139,9 @@ export default async function PaymentsPage({ searchParams }: Props) {
         </div>
         {items.length === 0 ? (
           <p className="text-muted px-4 py-10 text-center">
-            {filter === "pending" ? "No pending transactions." : "No transactions yet."}
+            {filter === "pending"
+              ? "No pending transactions."
+              : "No payments recorded yet. Open an invoice and choose Record payment."}
           </p>
         ) : (
           <ul className="divide-line flex flex-col divide-y">

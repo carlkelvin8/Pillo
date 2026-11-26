@@ -84,7 +84,7 @@ export default async function InboxPage({ searchParams }: Props) {
       <PageHeader eyebrow="Assistant" title="Dr. Pill" />
       <DrPillTabs active="conversations" isOwner={can(membership.role, "staff.manage")} />
 
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
         <Card className="flex h-[min(76vh,52rem)] min-h-[36rem] flex-col gap-3 p-3">
           <div className="flex gap-1.5 px-1 pt-1">
             <Link

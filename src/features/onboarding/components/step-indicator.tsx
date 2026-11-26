@@ -14,7 +14,7 @@ export function StepIndicator({ current }: { current: 1 | 2 | 3 | 4 }) {
             key={label}
             aria-current={state === "current" ? "step" : undefined}
             className={cn(
-              "inline-flex min-h-9 items-center gap-2 rounded-full px-4 text-sm font-medium",
+              "inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-medium",
               state === "current" && "bg-ink text-surface",
               state === "done" && "bg-mint text-mint-ink",
               state === "todo" && "border-line-strong text-muted border",

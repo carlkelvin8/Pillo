@@ -1,8 +1,10 @@
 "use client";
 
-import { Bell, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { Role } from "@/features/auth/permissions";
+import { NotificationsBell } from "@/features/notifications/notifications-bell";
+import { HeaderSearch } from "@/features/search/header-search";
 import { DrPillCompanion } from "./dr-pill-companion";
 import { MobileNav } from "./mobile-nav";
 
@@ -81,26 +83,9 @@ export function AppShellFrame({
                   <PanelLeftClose className="size-5" aria-hidden="true" />
                 )}
               </button>
-              {/* Search and notifications are placeholders until their features are available. */}
-              <label className="rounded-control border-line bg-surface text-muted flex min-h-11 max-w-90 flex-1 items-center gap-2.5 border px-4">
-                <Search className="size-4 shrink-0" aria-hidden="true" />
-                <span className="sr-only">Search</span>
-                <input
-                  type="search"
-                  disabled
-                  placeholder="Search coming soon"
-                  className="placeholder:text-muted w-full min-w-0 bg-transparent text-sm outline-none"
-                />
-              </label>
+              <HeaderSearch />
             </div>
-            <button
-              type="button"
-              disabled
-              aria-label="Notifications (coming soon)"
-              className="rounded-control border-line bg-surface text-ink inline-flex size-11 shrink-0 items-center justify-center border disabled:opacity-50"
-            >
-              <Bell className="size-[18px]" aria-hidden="true" />
-            </button>
+            <NotificationsBell />
           </div>
         </header>
         <main className="sm:px-page mx-auto flex w-full max-w-[112rem] min-w-0 flex-col gap-8 px-6 pt-2 pb-16">

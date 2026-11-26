@@ -38,7 +38,7 @@ const NAV: NavGroup[] = [
   {
     label: "Money",
     items: [
-      { href: "/payments", label: "Payments", icon: Wallet, capability: "payments.manage" },
+      { href: "/payments", label: "Payment records", icon: Wallet, capability: "payments.manage" },
       { href: "/invoices", label: "Invoices", icon: FileText, capability: "invoices.create" },
     ],
   },

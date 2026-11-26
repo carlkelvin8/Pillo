@@ -10,7 +10,7 @@ describe("navForRole", () => {
       "Dashboard",
       "Appointments",
       "Patients",
-      "Payments",
+      "Payment records",
       "Invoices",
       "Dr. Pill",
       "Integrations",
@@ -25,7 +25,7 @@ describe("navForRole", () => {
       "Dashboard",
       "Appointments",
       "Patients",
-      "Payments",
+      "Payment records",
       "Invoices",
     ]);
   });

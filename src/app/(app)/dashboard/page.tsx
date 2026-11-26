@@ -8,11 +8,10 @@ import { requireMembership } from "@/features/auth/workspace";
 import { getChairFillerSummary } from "@/features/chair-filler/queries";
 import { AppointmentsLineChart, CollectionsBarChart } from "@/features/dashboard/trend-charts";
 import { invoiceStats } from "@/features/invoices/queries";
-import { BalanceHero } from "@/features/payments/components/balance-hero";
+import { RecordedHero } from "@/features/payments/components/recorded-hero";
 import { dashboardAnalyticsLayout } from "@/features/dashboard/layout";
 import {
   collectionsData,
-  getBalance,
   listTransactions,
   sumOnDay,
 } from "@/features/payments/queries";
@@ -20,7 +19,7 @@ import { patientNames, patientStats } from "@/features/patients/queries";
 import { appointmentTrendRange } from "@/features/scheduling/dashboard-trend";
 import { listAppointments, monthlyAppointmentCounts } from "@/features/scheduling/queries";
 import { STATUS_LABEL, STATUS_TONE } from "@/features/scheduling/status";
-import { dayBoundsUtc, formatTime, lastMonths, todayIn, zonedToUtcIso } from "@/lib/datetime";
+import { dateOf, dayBoundsUtc, formatTime, lastMonths, todayIn, zonedToUtcIso } from "@/lib/datetime";
 import { formatPHP } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
@@ -80,9 +79,8 @@ export default async function DashboardPage() {
   const { start, end } = dayBoundsUtc(today, tz);
 
   const showRecovered = can(role, "staff.manage");
-  const [balance, collections, tx, inv, todays, recovered, appointmentTrend, patients] =
+  const [collections, tx, inv, todays, recovered, appointmentTrend, patients] =
     await Promise.all([
-      showMoney ? getBalance(clinic.id) : Promise.resolve(0),
       showMoney ? collectionsData(clinic.id, sinceIso, tz) : Promise.resolve(null),
       showMoney ? listTransactions(clinic.id, 5) : Promise.resolve(null),
       showInvoices ? invoiceStats(clinic.id, today, monthStartIso) : Promise.resolve(null),
@@ -113,6 +111,10 @@ export default async function DashboardPage() {
   const remaining = todays.filter(
     (a) => a.ends_at > nowIso && (a.status === "scheduled" || a.status === "confirmed"),
   );
+  const thisMonth = today.slice(0, 7);
+  const recordedThisMonth = collections?.byMonth.get(thisMonth) ?? 0;
+  const recordedCount =
+    collections?.rows.filter((r) => dateOf(r.paid_at, tz).startsWith(thisMonth)).length ?? 0;
   const monthTotals = months.map((m) => collections?.byMonth.get(m) ?? 0);
   const canOpenPatients = can(role, "patients.directory");
   const analyticsLayout = dashboardAnalyticsLayout();
@@ -123,7 +125,7 @@ export default async function DashboardPage() {
 
       {showMoney ? (
         <div className={`grid items-stretch gap-6 ${analyticsLayout.columns}`}>
-          <BalanceHero centavos={balance} />
+          <RecordedHero centavos={recordedThisMonth} count={recordedCount} />
           {collections ? <CollectionsBarChart months={months} values={monthTotals} /> : null}
         </div>
       ) : null}

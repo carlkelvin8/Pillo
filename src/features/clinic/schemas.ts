@@ -60,6 +60,7 @@ export const clinicRowSchema = z.object({
   phone: z.string().nullable(),
   email: z.string().nullable(),
   timezone: z.string(),
+  logo_path: z.string().nullable().optional(),
   assistant_settings: assistantSettingsSchema,
   onboarding_completed_at: z.string().nullable(),
 });

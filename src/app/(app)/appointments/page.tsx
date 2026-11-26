@@ -271,7 +271,7 @@ export default async function AppointmentsPage({ searchParams }: Props) {
         </p>
       ) : null}
 
-      <div className="grid items-stretch gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-stretch gap-6 xl:grid-cols-3">
         <Card className="flex h-full flex-col gap-4 p-5 sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div>

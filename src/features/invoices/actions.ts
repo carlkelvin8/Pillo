@@ -12,7 +12,8 @@ import { invoiceLabel } from "./totals";
 import { echo, formString, type ActionState } from "@/lib/action-state";
 import { createClient } from "@/lib/supabase/server";
 import { invoiceItemSchema } from "./schemas";
-import { isDateString } from "@/lib/datetime";
+import { isDateString, todayIn, zonedToUtcIso } from "@/lib/datetime";
+import { onlinePaymentsEnabled } from "@/config/features";
 
 const DENIED: ActionState = { message: "You do not have permission to do that." };
 
@@ -211,6 +212,7 @@ export async function requestPaymentAction(
 ): Promise<ActionState> {
   const c = await ctx();
   if (!c) return DENIED;
+  if (!onlinePaymentsEnabled()) return { message: "Online payment links are coming soon." };
   const mcpRequestId = formString(formData, "mcpRequestId");
   const supabase = await createClient();
   let invoiceId = "";
@@ -355,6 +357,7 @@ export async function recordPaymentAction(
     invoiceId: formString(formData, "invoiceId"),
     method: formString(formData, "method"),
     amount: formString(formData, "amount"),
+    receivedOn: formString(formData, "receivedOn"),
     reference: formString(formData, "reference"),
   });
   if (!parsed.success) {
@@ -364,7 +367,15 @@ export async function recordPaymentAction(
     return {
       message: "Please check the highlighted fields.",
       fieldErrors: errors,
-      values: echo(formData, ["amount", "reference"]),
+      values: echo(formData, ["amount", "reference", "receivedOn", "method"]),
+    };
+  }
+  const today = todayIn(c.clinic.timezone);
+  if (parsed.data.receivedOn && parsed.data.receivedOn > today) {
+    return {
+      message: "Please check the highlighted fields.",
+      fieldErrors: { receivedOn: ["The date cannot be in the future."] },
+      values: echo(formData, ["amount", "reference", "receivedOn", "method"]),
     };
   }
   const supabase = await createClient();
@@ -385,6 +396,15 @@ export async function recordPaymentAction(
       .eq("clinic_id", c.clinic.id);
     if (error) return { message: "We could not send the invoice first." };
   }
+  if (!onlinePaymentsEnabled()) {
+    // Online links are switched off, so an old pending link only blocks logging what was received.
+    await supabase
+      .from("payments")
+      .update({ status: "cancelled" })
+      .eq("invoice_id", parsed.data.invoiceId)
+      .eq("clinic_id", c.clinic.id)
+      .eq("status", "pending");
+  }
   const { error } = await supabase.from("payments").insert({
     clinic_id: c.clinic.id,
     invoice_id: parsed.data.invoiceId,
@@ -393,12 +413,15 @@ export async function recordPaymentAction(
     status: "succeeded",
     provider: "manual",
     reference: parsed.data.reference ?? null,
-    paid_at: new Date().toISOString(),
+    paid_at:
+      parsed.data.receivedOn && parsed.data.receivedOn !== today
+        ? zonedToUtcIso(parsed.data.receivedOn, "12:00", c.clinic.timezone)
+        : new Date().toISOString(),
   });
   if (error)
     return {
       message: friendly(error, "We could not record that payment."),
-      values: echo(formData, ["amount", "reference"]),
+      values: echo(formData, ["amount", "reference", "receivedOn", "method"]),
     };
   await logAudit(supabase, c.clinic.id, "payment.recorded", "invoice", parsed.data.invoiceId, {
     method: parsed.data.method,

@@ -69,7 +69,7 @@ describe("InvoiceDetailPage", () => {
     render(await InvoiceDetailPage({ params: Promise.resolve({ id }) }));
 
     const details = within(screen.getByRole("region", { name: "Invoice details" }));
-    const payment = within(screen.getByRole("region", { name: "Payment" }));
+    const payment = within(screen.getByRole("region", { name: "Payment record" }));
     const timeline = within(screen.getByRole("region", { name: "Timeline" }));
 
     expect(details.getByText("Edit draft invoice")).toBeInTheDocument();
@@ -77,10 +77,9 @@ describe("InvoiceDetailPage", () => {
       "href",
       `/api/invoices/${id}/pdf`,
     );
-    expect(payment.getByRole("button", { name: "Request payment" })).toBeInTheDocument();
-    expect(
-      payment.getByRole("button", { name: "Record cash or bank payment" }),
-    ).toBeInTheDocument();
+    expect(payment.queryByRole("button", { name: "Request payment" })).not.toBeInTheDocument();
+    expect(payment.getByText("Online payments: coming soon")).toBeInTheDocument();
+    expect(payment.getByRole("button", { name: "Record payment" })).toBeInTheDocument();
     expect(timeline.getByRole("listitem")).toHaveTextContent("Invoice created");
   });
 
@@ -92,14 +91,14 @@ describe("InvoiceDetailPage", () => {
     });
     render(await InvoiceDetailPage({ params: Promise.resolve({ id }) }));
 
-    const paymentCard = within(screen.getByRole("region", { name: "Payment" }));
+    const paymentCard = within(screen.getByRole("region", { name: "Payment record" }));
     const receipt = within(paymentCard.getByRole("region", { name: "Payment receipt" }));
     const timeline = within(screen.getByRole("region", { name: "Timeline" }));
     expect(receipt.getByText("Paid in full")).toBeInTheDocument();
     expect(receipt.getByText(payment.reference!)).toBeInTheDocument();
     expect(paymentCard.queryByRole("button", { name: "Request payment" })).toBeNull();
     const events = timeline.getAllByRole("listitem");
-    expect(events[1]).toHaveTextContent("Payment received · Bank transfer");
+    expect(events[1]).toHaveTextContent("Payment recorded · Bank transfer");
     expect(events[1]?.querySelector("time")).toHaveAttribute("datetime", paidAt);
   });
 });

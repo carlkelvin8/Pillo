@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { requireMembership } from "@/features/auth/workspace";
+import { clinicLogoUrl } from "@/features/clinic/logo";
 import { AppShell } from "@/features/shell/app-shell";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
@@ -9,6 +10,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       user={{ name: user.fullName, email: user.email }}
       role={membership.role}
       clinicName={membership.clinic.name}
+      logoUrl={clinicLogoUrl(membership.clinic.logo_path)}
     >
       {children}
     </AppShell>
