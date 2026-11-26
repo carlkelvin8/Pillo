@@ -1,21 +1,27 @@
 import { expect, test } from "@playwright/test";
 
-test("keeps the hero headline and signup action in compact mobile viewports", async ({ page }) => {
+test("keeps hero copy and signup visible on compact and landscape screens", async ({ page }) => {
   for (const viewport of [
     { width: 320, height: 568 },
     { width: 390, height: 667 },
+    { width: 667, height: 375 },
+    { width: 844, height: 390 },
+    { width: 820, height: 768 },
   ]) {
     await page.setViewportSize(viewport);
     await page.goto("/");
 
     const hero = page.locator("#hero");
     const header = await page.getByRole("banner").boundingBox();
+    const chip = await hero.getByText("Made for clinics in the Philippines").boundingBox();
     const heading = await hero.getByRole("heading", { level: 1 }).boundingBox();
     const signup = await hero.getByRole("link", { name: "Create your clinic" }).boundingBox();
 
     expect(header).not.toBeNull();
+    expect(chip).not.toBeNull();
     expect(heading).not.toBeNull();
     expect(signup).not.toBeNull();
+    expect(chip!.y).toBeGreaterThanOrEqual(header!.y + header!.height);
     expect(heading!.y).toBeGreaterThanOrEqual(header!.y + header!.height);
     expect(heading!.y + heading!.height).toBeLessThan(viewport.height);
     expect(signup!.y + signup!.height).toBeLessThan(viewport.height);
@@ -24,22 +30,27 @@ test("keeps the hero headline and signup action in compact mobile viewports", as
 });
 
 test("keeps the desktop hero CTA separate from its mascot", async ({ page }) => {
-  const viewport = { width: 1440, height: 900 };
-  await page.setViewportSize(viewport);
-  await page.goto("/");
+  for (const viewport of [
+    { width: 1366, height: 768 },
+    { width: 1440, height: 900 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
 
-  const hero = page.locator("#hero");
-  const header = await page.getByRole("banner").boundingBox();
-  const heading = await hero.getByRole("heading", { level: 1 }).boundingBox();
-  const signup = await hero.getByRole("link", { name: "Create your clinic" }).boundingBox();
-  const mascot = await hero.locator("[data-mascot-anchor]").boundingBox();
+    const hero = page.locator("#hero");
+    const header = await page.getByRole("banner").boundingBox();
+    const heading = await hero.getByRole("heading", { level: 1 }).boundingBox();
+    const signup = await hero.getByRole("link", { name: "Create your clinic" }).boundingBox();
+    const mascot = await hero.locator("[data-mascot-anchor]").boundingBox();
 
-  expect(header).not.toBeNull();
-  expect(heading).not.toBeNull();
-  expect(signup).not.toBeNull();
-  expect(mascot).not.toBeNull();
-  expect(heading!.y).toBeGreaterThanOrEqual(header!.y + header!.height);
-  expect(signup!.x + signup!.width).toBeLessThan(mascot!.x);
+    expect(header).not.toBeNull();
+    expect(heading).not.toBeNull();
+    expect(signup).not.toBeNull();
+    expect(mascot).not.toBeNull();
+    expect(heading!.y).toBeGreaterThanOrEqual(header!.y + header!.height);
+    expect(signup!.y + signup!.height).toBeLessThan(viewport.height);
+    expect(signup!.x + signup!.width).toBeLessThan(mascot!.x);
+  }
 });
 
 test("keeps hero content visible with reduced motion", async ({ page }) => {

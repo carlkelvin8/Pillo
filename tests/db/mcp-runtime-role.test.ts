@@ -126,8 +126,12 @@ describe("pillo_mcp role: allowed statements (everything src/features/mcp issues
                values (${clinic}, ${inv!.id}, 0, 'Cleaning', 2, 50000)`;
       const [row] = await tx<{ total_centavos: string }[]>`select total_centavos from public.invoices where id = ${inv!.id} and clinic_id = ${clinic}`;
       expect(Number(row?.total_centavos)).toBe(100000);
-      await tx`insert into public.agent_actions (clinic_id, kind, status, autonomy, payload, outcome)
-               values (${clinic}, 'mcp_request_payment', 'proposed', 'approve', jsonb_build_object('invoice_id', ${inv!.id}::text), 'Waiting for staff approval')`;
+      const [proposal] = await tx<{ id: string; status: string }[]>`
+        insert into public.agent_actions (clinic_id, kind, status, autonomy, payload, outcome)
+        values (${clinic}, 'mcp_request_payment', 'proposed', 'approve', jsonb_build_object('invoice_id', ${inv!.id}::text), 'Waiting for staff approval')
+        returning id, status
+      `;
+      expect(proposal).toEqual({ id: expect.any(String), status: "proposed" });
     }, { clinicId: clinic });
   });
 
