@@ -29,6 +29,11 @@ export async function asAnon<T>(fn: (tx: Sql) => Promise<T>): Promise<T> {
   return runRolledBack("anon", { role: "anon" }, fn);
 }
 
+/** Run `fn` as the least-privilege MCP runtime role. Always rolls back. */
+export async function asMcpRuntime<T>(fn: (tx: Sql) => Promise<T>): Promise<T> {
+  return runRolledBack("pillo_mcp", {}, fn);
+}
+
 class Rollback<T> extends Error {
   constructor(readonly value: T) {
     super("rollback");
@@ -36,7 +41,7 @@ class Rollback<T> extends Error {
 }
 
 async function runRolledBack<T>(
-  role: "authenticated" | "anon",
+  role: "authenticated" | "anon" | "pillo_mcp",
   claims: Record<string, string>,
   fn: (tx: Sql) => Promise<T>,
 ): Promise<T> {

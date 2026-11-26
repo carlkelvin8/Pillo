@@ -15,7 +15,7 @@ export default async function Page() {
   const supabase = await createClient();
   const [tokenResult, activityResult] = await Promise.all([
     supabase.from("mcp_tokens")
-      .select("id, name, scopes, created_at, last_used_at, revoked_at")
+      .select("id, name, scopes, created_at, last_used_at, revoked_at, expires_at")
       .eq("clinic_id", membership.clinic.id).order("created_at", { ascending: false }),
     supabase.from("audit_log").select("at, action, meta")
       .eq("clinic_id", membership.clinic.id).like("action", "mcp.%")
@@ -26,6 +26,7 @@ export default async function Page() {
     id: String(row.id), name: String(row.name), scopes: Array.isArray(row.scopes) ? row.scopes.map(String) : [],
     created_at: String(row.created_at), last_used_at: row.last_used_at ? String(row.last_used_at) : null,
     revoked_at: row.revoked_at ? String(row.revoked_at) : null,
+    expires_at: String(row.expires_at),
   }));
   const activity = projectMcpActivity(activityResult.data ?? []);
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";

@@ -139,6 +139,7 @@ pnpm test:db   # RLS tests on a throwaway local Postgres (needs postgres/initdb 
 - Money is integer centavos (`src/lib/money.ts`). Timezone Asia/Manila. Languages: English and Filipino (Taglish in Dr. Pill).
 - Medical data, RA 10173 principles: consent, minimal data, audit log on record reads, no patient names or contact details in application logs.
 - Dr. Pill never answers medical questions; it hands off to a human for medical advice, refunds and upset patients.
+- MCP connects through `DATABASE_URL_MCP` as the limited `pillo_mcp` role (no DELETE/DDL, column-level grants only; enable it once with `alter role pillo_mcp login password '...'`; required in production, dev falls back to `DATABASE_URL`). Tokens expire (30 days, 90 days or 1 year; DB cap 366 days) and the auth query rejects expired ones. Tests: `tests/db/mcp-runtime-role.test.ts`.
 - MCP has no money-sending tool. `request_payment` needs explicit staff approval in the app. Reading patient records is off by default. Every call goes to `audit_log`.
 - Use placeholders like `[YOUR EMAIL]`, `[YOUR PRICE]` for unknown business details. Do not invent facts, prices or statistics.
 - If a requirement is ambiguous or risky (money, medical data), stop and ask.

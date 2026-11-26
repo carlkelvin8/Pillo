@@ -12,6 +12,8 @@ const serverEnvSchema = z.object({
   /** Live patient chat and owner questions. Off unless exactly "true". Keep off until the clinic-data privacy decision is made (CLAUDE.md). */
   LIVE_AI_ENABLED: z.boolean().optional(),
   DATABASE_URL: z.url().optional(),
+  /** Connection for the MCP route as the least-privilege `pillo_mcp` role (see the 20261206 migration). */
+  DATABASE_URL_MCP: z.url().optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -26,6 +28,7 @@ export function serverEnv(): ServerEnv {
     GEMINI_MODEL: process.env.GEMINI_MODEL || undefined,
     LIVE_AI_ENABLED: process.env.LIVE_AI_ENABLED === "true",
     DATABASE_URL: process.env.DATABASE_URL || undefined,
+    DATABASE_URL_MCP: process.env.DATABASE_URL_MCP || undefined,
   });
   return parsed.success ? parsed.data : {};
 }
