@@ -13,10 +13,13 @@ import {
 import { sanitizeSearch } from "@/features/patients/age";
 import { echo, formString, validationFailed, type ActionState } from "@/lib/action-state";
 import { createClient } from "@/lib/supabase/server";
-import { parsePatientCsv } from "@/features/patients/import-csv";
+import { parsePatientCsv, patientDedupKey } from "@/features/patients/import-csv";
 
 const DENIED: ActionState = { message: "You do not have permission to do that." };
 const PATIENT_KEYS = ["fullName", "birthdate", "sex", "phone", "email"] as const;
+const DEDUP_PAGE_SIZE = 1000;
+const DEDUP_MAX_PAGES = 50;
+const DEDUP_FAILED = "We could not check for duplicates. Nothing was imported.";
 
 export async function importPatientsCsvAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const ws = await getWorkspace();
@@ -29,12 +32,23 @@ export async function importPatientsCsvAction(_prev: ActionState, formData: Form
   const supabase = await createClient();
   const clinicId = ws.membership.clinic.id;
   // Skip repeats: the same name and phone twice in the file, or a patient the clinic already has.
-  const key = (name: string, phone: string | null) => `${name.trim().toLowerCase()}|${(phone ?? "").replace(/\s+/g, "")}`;
-  const names = [...new Set(parsed.rows.map((row) => row.full_name))];
-  const { data: existing } = await supabase.from("patients").select("full_name, phone").eq("clinic_id", clinicId).in("full_name", names);
-  const seen = new Set(((existing ?? []) as { full_name: string; phone: string | null }[]).map((p) => key(p.full_name, p.phone)));
+  // Read the clinic's whole directory in pages (names are matched case-insensitively, so `.in()` cannot do it).
+  const seen = new Set<string>();
+  for (let page = 0; ; page++) {
+    if (page >= DEDUP_MAX_PAGES) return { message: DEDUP_FAILED };
+    const from = page * DEDUP_PAGE_SIZE;
+    const { data: existing, error: existingError } = await supabase
+      .from("patients")
+      .select("full_name, phone")
+      .eq("clinic_id", clinicId)
+      .order("id")
+      .range(from, from + DEDUP_PAGE_SIZE - 1);
+    if (existingError || !existing) return { message: DEDUP_FAILED };
+    for (const p of existing as { full_name: string; phone: string | null }[]) seen.add(patientDedupKey(p.full_name, p.phone));
+    if (existing.length < DEDUP_PAGE_SIZE) break;
+  }
   const fresh = parsed.rows.filter((row) => {
-    const k = key(row.full_name, row.phone);
+    const k = patientDedupKey(row.full_name, row.phone);
     if (seen.has(k)) return false;
     seen.add(k);
     return true;

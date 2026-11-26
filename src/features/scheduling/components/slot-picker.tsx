@@ -13,6 +13,8 @@ type Props = {
   openDates: string[];
   tz: string;
   excludeAppointmentId?: string;
+  /** Date to start on (clinic-local), e.g. the appointment being moved; falls back to the first open date. */
+  initialDate?: string;
   /** Name of the hidden input carrying the chosen start (UTC ISO). */
   name?: string;
   error?: string;
@@ -29,10 +31,13 @@ export function SlotPicker({
   openDates,
   tz,
   excludeAppointmentId,
+  initialDate,
   name = "startsAt",
   error,
 }: Props) {
-  const [date, setDate] = useState(openDates[0] ?? "");
+  const [date, setDate] = useState(
+    initialDate && openDates.includes(initialDate) ? initialDate : (openDates[0] ?? ""),
+  );
   const [slots, setSlots] = useState<string[]>([]);
   const [selected, setSelected] = useState("");
   const [loaded, setLoaded] = useState(false);

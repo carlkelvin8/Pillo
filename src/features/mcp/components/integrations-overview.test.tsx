@@ -14,6 +14,7 @@ describe("IntegrationsOverview", () => {
     );
 
     expect(screen.getByText("Database connection needed")).toBeInTheDocument();
+    expect(screen.getByText(/DATABASE_URL_MCP/)).toHaveTextContent(/pillo_mcp/);
     expect(screen.getByText("https://clinic.example/api/mcp")).toBeInTheDocument();
     expect(screen.getByText("get_patient_summary")).toBeInTheDocument();
     expect(screen.getByText("No MCP activity yet.")).toBeInTheDocument();

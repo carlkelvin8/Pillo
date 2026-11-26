@@ -25,7 +25,7 @@ export default async function BranchesSettingsPage() {
       <PageHeader eyebrow="Settings" title="Branches and hours" actions={<AddBranchDialog />} />
       {branches.map((b) => {
         const rows = hours.filter((h) => h.branch_id === b.id);
-        const saved = rows.length > 0;
+        const saved = rows.length > 0 || Boolean(b.hours_saved_at);
         // With no saved hours, suggest Monday to Friday 9 to 5. It is only a starting point and is not saved.
         const days: DayHours[] = WEEKDAYS.map((weekday) => {
           const row = rows.find((r) => r.weekday === weekday);

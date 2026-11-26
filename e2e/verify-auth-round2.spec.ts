@@ -8,11 +8,104 @@ const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
   "base64",
 );
-const today = new Date().toISOString().slice(0, 10);
+// The clinic's own calendar day (Asia/Manila), not UTC.
+const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
 const BRANCH = `VERIFY Branch ${today}`;
 const DOCTOR = `VERIFY Doctor ${today}`;
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
+type DayState = { day: (typeof DAYS)[number]; open: boolean; opens: string; closes: string };
+type Pin = { latitude: string; longitude: string };
 
 const sidebarLogos = (page: Page) => page.locator('img[src*="clinic-logos"]');
+const branchSection = (page: Page) => page.locator(`section[aria-label="${BRANCH}"]`);
+
+/** Creates this spec's own branch if it does not exist yet (no dependency on other specs). */
+async function ensureBranch(page: Page) {
+  await page.goto("/settings/branches", GO);
+  if (await branchSection(page).count()) return;
+  await page.getByRole("button", { name: "Add branch" }).click();
+  await page.getByRole("dialog").getByLabel("Branch name").fill(BRANCH);
+  await page.getByRole("dialog").getByRole("button", { name: "Add branch" }).click();
+  await expect(page.getByText(BRANCH).first()).toBeVisible({ timeout: 60_000 });
+  await page.reload();
+  await expect(branchSection(page)).toBeVisible({ timeout: 60_000 });
+}
+
+/** Creates this spec's own doctor if it does not exist yet, and makes sure it is active. */
+async function ensureDoctor(page: Page) {
+  await page.goto("/settings/doctors", GO);
+  if (await page.locator("li", { hasText: DOCTOR }).count()) {
+    const activate = page.getByRole("button", { name: `Activate ${DOCTOR}` });
+    if (await activate.count()) await activate.click();
+    await expect(page.getByRole("button", { name: `Deactivate ${DOCTOR}` })).toBeVisible({ timeout: 120_000 });
+    return;
+  }
+  await page.getByRole("button", { name: "Add doctor" }).click();
+  await page.getByRole("dialog").getByLabel("Name").fill(DOCTOR);
+  await page.getByRole("dialog").getByRole("button", { name: "Add doctor" }).click();
+  await expect(page.getByText(DOCTOR).first()).toBeVisible({ timeout: 60_000 });
+  await page.reload();
+}
+
+async function readHours(page: Page): Promise<DayState[]> {
+  const sec = branchSection(page);
+  const out: DayState[] = [];
+  for (const day of DAYS) {
+    out.push({
+      day,
+      open: await sec.getByLabel(day, { exact: true }).isChecked(),
+      opens: await sec.getByLabel(`${day} opens`).inputValue(),
+      closes: await sec.getByLabel(`${day} closes`).inputValue(),
+    });
+  }
+  return out;
+}
+
+async function readPin(page: Page): Promise<Pin> {
+  const sec = branchSection(page);
+  return {
+    latitude: await sec.locator('input[name="latitude"]').inputValue(),
+    longitude: await sec.locator('input[name="longitude"]').inputValue(),
+  };
+}
+
+async function restoreHours(page: Page, days: DayState[]) {
+  await page.goto("/settings/branches", GO);
+  const sec = branchSection(page);
+  // Nothing to undo when the save never went through.
+  if (JSON.stringify(await readHours(page)) === JSON.stringify(days)) return;
+  for (const d of days) {
+    await sec.getByLabel(`${d.day} opens`).fill(d.opens);
+    await sec.getByLabel(`${d.day} closes`).fill(d.closes);
+    await sec.getByLabel(d.day, { exact: true }).setChecked(d.open);
+  }
+  await sec.getByRole("button", { name: "Save hours" }).click();
+  await expect(sec.getByText("Hours saved.")).toBeVisible({ timeout: 60_000 });
+}
+
+/** Puts the original pin back: cleared, or re-chosen through a mocked geocoder result. */
+async function restorePin(page: Page, pin: Pin) {
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await page.goto("/settings/branches", GO);
+  const sec = branchSection(page);
+  if (pin.latitude && pin.longitude) {
+    await page.route("**/api/geocoding/search*", (route) =>
+      route.fulfill({
+        json: [{ lat: pin.latitude, lon: pin.longitude, display_name: "VERIFY Original Pin" }],
+      }),
+    );
+    await sec.getByLabel("Search address or place").fill("verify restore");
+    await sec.getByRole("button", { name: "Search", exact: true }).click();
+    await sec.getByRole("button", { name: "VERIFY Original Pin" }).click();
+  } else if (await sec.getByRole("button", { name: "Clear pin" }).count()) {
+    await sec.getByRole("button", { name: "Clear pin" }).click();
+  }
+  await sec.getByRole("button", { name: "Save branch" }).click();
+  await page.waitForTimeout(3000);
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await page.reload();
+  expect(await readPin(page)).toEqual(pin);
+}
 
 test("safe redirects on auth callback and recovery", async ({ request }) => {
   const cases = [
@@ -161,76 +254,125 @@ test("dr-pill switch persists and visit value validates", async ({ page }) => {
 });
 
 test("branch hours validation and persistence, address search and pin", async ({ page }) => {
+  test.setTimeout(480_000); // several saves plus cleanup on a slow dev server
   await signInAs(page, QA_ACCOUNTS.owner);
-  await page.goto("/settings/branches", GO);
-  const sec = page.locator(`section[aria-label="${BRANCH}"]`);
-  await expect(sec).toBeVisible();
-  await sec.getByLabel("Monday", { exact: true }).check();
-  await sec.getByLabel("Monday opens").fill("17:00");
-  await sec.getByLabel("Monday closes").fill("09:00");
-  await sec.getByRole("button", { name: "Save hours" }).click();
-  await expect(sec.getByText("Closing time must be after opening time.")).toBeVisible({ timeout: 60_000 });
-  await sec.getByLabel("Monday opens").fill("08:30");
-  await sec.getByLabel("Monday closes").fill("12:00");
-  await sec.getByLabel("Sunday", { exact: true }).uncheck();
-  await sec.getByRole("button", { name: "Save hours" }).click();
-  await expect(sec.getByText("Hours saved.")).toBeVisible({ timeout: 60_000 });
-  await page.reload();
-  const s2 = page.locator(`section[aria-label="${BRANCH}"]`);
-  await expect(s2.getByLabel("Monday opens")).toHaveValue("08:30");
-  await expect(s2.getByLabel("Monday closes")).toHaveValue("12:00");
-  await expect(s2.getByLabel("Sunday", { exact: true })).not.toBeChecked();
+  await ensureBranch(page);
+  const originalHours = await readHours(page);
+  const originalPin = await readPin(page);
+  let hoursChanged = false;
+  let pinChanged = false;
+  try {
+    const sec = branchSection(page);
+    await sec.getByLabel("Monday", { exact: true }).check();
+    await sec.getByLabel("Monday opens").fill("17:00");
+    await sec.getByLabel("Monday closes").fill("09:00");
+    await sec.getByRole("button", { name: "Save hours" }).click();
+    await expect(sec.getByText("Closing time must be after opening time.")).toBeVisible({ timeout: 60_000 });
+    await sec.getByLabel("Monday opens").fill("08:30");
+    await sec.getByLabel("Monday closes").fill("12:00");
+    await sec.getByLabel("Sunday", { exact: true }).uncheck();
+    hoursChanged = true;
+    await sec.getByRole("button", { name: "Save hours" }).click();
+    await expect(sec.getByText("Hours saved.")).toBeVisible({ timeout: 60_000 });
+    await page.reload();
+    const s2 = branchSection(page);
+    await expect(s2.getByLabel("Monday opens")).toHaveValue("08:30");
+    await expect(s2.getByLabel("Monday closes")).toHaveValue("12:00");
+    await expect(s2.getByLabel("Sunday", { exact: true })).not.toBeChecked();
 
-  // Geocoder mocked: empty, 502, 429, then a result.
-  const search = s2.getByLabel("Search address or place");
-  const mode: { v: "empty" | "502" | "429" | "ok" } = { v: "empty" };
-  await page.route("**/api/geocoding/search*", (route) => {
-    if (mode.v === "empty") return route.fulfill({ json: [] });
-    if (mode.v === "502") return route.fulfill({ status: 502, json: { error: "Place search is temporarily unavailable." } });
-    if (mode.v === "429") return route.fulfill({ status: 429, json: { error: "Please wait a moment before searching again." } });
-    return route.fulfill({ json: [{ lat: "14.5995", lon: "120.9842", display_name: "VERIFY Manila Place" }] });
-  });
-  for (const m of ["empty", "502", "429"] as const) {
-    mode.v = m;
-    await search.fill(`verify ${m}`);
+    // Geocoder mocked: empty, 502, 429, then a result.
+    const search = s2.getByLabel("Search address or place");
+    const mode: { v: "empty" | "502" | "429" | "ok" } = { v: "empty" };
+    await page.route("**/api/geocoding/search*", (route) => {
+      if (mode.v === "empty") return route.fulfill({ json: [] });
+      if (mode.v === "502") return route.fulfill({ status: 502, json: { error: "Place search is temporarily unavailable." } });
+      if (mode.v === "429") return route.fulfill({ status: 429, json: { error: "Please wait a moment before searching again." } });
+      return route.fulfill({ json: [{ lat: "14.5995", lon: "120.9842", display_name: "VERIFY Manila Place" }] });
+    });
+    for (const m of ["empty", "502", "429"] as const) {
+      mode.v = m;
+      await search.fill(`verify ${m}`);
+      await s2.getByRole("button", { name: "Search", exact: true }).click();
+      await expect(s2.getByRole(m === "empty" ? "status" : "alert").or(s2.getByRole("status"))).toBeVisible({ timeout: 30_000 });
+    }
+    mode.v = "ok";
+    await search.fill("verify ok");
     await s2.getByRole("button", { name: "Search", exact: true }).click();
-    await expect(s2.getByRole(m === "empty" ? "status" : "alert").or(s2.getByRole("status"))).toBeVisible({ timeout: 30_000 });
-    console.log(m, "->", await s2.locator('[role="alert"],[role="status"]').first().innerText());
+    await s2.getByRole("button", { name: "VERIFY Manila Place" }).click();
+    pinChanged = true;
+    await s2.getByRole("button", { name: "Save branch" }).click();
+    await page.waitForTimeout(3000);
+    await page.reload();
+    await expect(branchSection(page).getByRole("button", { name: "Clear pin" })).toBeVisible();
+  } finally {
+    if (hoursChanged) await restoreHours(page, originalHours);
+    if (pinChanged) await restorePin(page, originalPin);
   }
-  mode.v = "ok";
-  await search.fill("verify ok");
-  await s2.getByRole("button", { name: "Search", exact: true }).click();
-  await s2.getByRole("button", { name: "VERIFY Manila Place" }).click();
-  await s2.getByRole("button", { name: "Save branch" }).click();
-  await page.waitForTimeout(3000);
-  await page.reload();
-  await expect(page.locator(`section[aria-label="${BRANCH}"]`).getByRole("button", { name: "Clear pin" })).toBeVisible();
 });
 
 test("doctor hours and activate/deactivate affects booking form", async ({ page }) => {
+  test.setTimeout(480_000); // several saves plus cleanup on a slow dev server
   await signInAs(page, QA_ACCOUNTS.owner);
-  await page.goto("/settings/doctors", GO);
-  const row = page.locator("li", { hasText: DOCTOR });
-  await row.locator("summary").click();
-  const form = row.locator("form", { has: page.getByRole("button", { name: "Add", exact: true }) });
-  await form.getByLabel("Starts").fill("15:00");
-  await form.getByLabel("Ends").fill("10:00");
-  await form.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(row.getByText("End time must be after start time.")).toBeVisible({ timeout: 60_000 });
-  await form.getByLabel("Ends").fill("18:00");
-  await form.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(row.getByRole("button", { name: "Remove window" })).toBeVisible({ timeout: 60_000 });
-  await page.reload();
-  await page.locator("li", { hasText: DOCTOR }).locator("summary").click();
-  await page.locator("li", { hasText: DOCTOR }).getByRole("button", { name: "Remove window" }).first().click();
-  await expect(page.locator("li", { hasText: DOCTOR }).getByRole("button", { name: "Remove window" })).toHaveCount(0, { timeout: 60_000 });
+  await ensureBranch(page);
+  await ensureDoctor(page);
+  const doctorRow = () => page.locator("li", { hasText: DOCTOR });
+  // The window this test adds, found by its own times (never .first()).
+  const addedWindows = async () => {
+    const all = doctorRow().locator("div.flex.flex-col.gap-2");
+    const found = [];
+    for (let i = 0; i < (await all.count()); i++) {
+      const w = all.nth(i);
+      if (
+        (await w.locator('input[name="startsAt"]').inputValue()) === "15:00" &&
+        (await w.locator('input[name="endsAt"]').inputValue()) === "18:00"
+      )
+        found.push(w);
+    }
+    return found;
+  };
+  let windowAdded = false;
+  let deactivated = false;
+  try {
+    await doctorRow().locator("summary").click();
+    const form = doctorRow().locator("form", { has: page.getByRole("button", { name: "Add", exact: true }) });
+    await form.getByLabel("Starts").fill("15:00");
+    await form.getByLabel("Ends").fill("10:00");
+    await form.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(doctorRow().getByText("End time must be after start time.")).toBeVisible({ timeout: 60_000 });
+    const before = (await addedWindows()).length;
+    // The form resets after an error: fill both times again.
+    await form.getByLabel("Starts").fill("15:00");
+    await form.getByLabel("Ends").fill("18:00");
+    windowAdded = true;
+    await form.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(doctorRow().getByText("Weekly hours saved.")).toBeVisible({ timeout: 60_000 });
+    await page.reload();
+    await doctorRow().locator("summary").click();
+    await expect.poll(async () => (await addedWindows()).length, { timeout: 60_000 }).toBe(before + 1);
+    await (await addedWindows()).at(-1)!.getByRole("button", { name: "Remove window" }).click();
+    await expect.poll(async () => (await addedWindows()).length, { timeout: 60_000 }).toBe(before);
+    windowAdded = false;
 
-  await page.getByRole("button", { name: `Deactivate ${DOCTOR}` }).click();
-  await expect(page.getByRole("button", { name: `Activate ${DOCTOR}` })).toBeVisible({ timeout: 60_000 });
-  await page.goto("/appointments", GO);
-  await page.getByRole("button", { name: "New appointment" }).click();
-  await expect(page.getByRole("dialog").getByText(DOCTOR)).toHaveCount(0);
-  await page.goto("/settings/doctors", GO);
-  await page.getByRole("button", { name: `Activate ${DOCTOR}` }).click();
-  await expect(page.getByRole("button", { name: `Deactivate ${DOCTOR}` })).toBeVisible({ timeout: 60_000 });
+    deactivated = true;
+    await page.getByRole("button", { name: `Deactivate ${DOCTOR}` }).click();
+    await expect(page.getByRole("button", { name: `Activate ${DOCTOR}` })).toBeVisible({ timeout: 60_000 });
+    await page.goto("/appointments", GO);
+    await page.getByRole("button", { name: "New appointment" }).click();
+    await expect(page.getByRole("dialog").getByText(DOCTOR)).toHaveCount(0);
+  } finally {
+    await page.goto("/settings/doctors", GO);
+    if (windowAdded) {
+      await doctorRow().locator("summary").click();
+      const leftover = (await addedWindows()).at(-1);
+      if (leftover) {
+        await leftover.getByRole("button", { name: "Remove window" }).click();
+        await page.waitForTimeout(3000);
+      }
+    }
+    const activate = page.getByRole("button", { name: `Activate ${DOCTOR}` });
+    if (deactivated || (await activate.count())) {
+      if (await activate.count()) await activate.click();
+      await expect(page.getByRole("button", { name: `Deactivate ${DOCTOR}` })).toBeVisible({ timeout: 120_000 });
+    }
+  }
 });

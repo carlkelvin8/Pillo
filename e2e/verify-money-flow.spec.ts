@@ -26,17 +26,25 @@ async function tileCents(page: Page, label: string) {
 }
 
 let invoiceUrl = "";
+// This spec's own patient (never a seeded one), unique per run.
+const PATIENT = `VERIFY ${Date.now()}`;
 
 test("create invoice: validation, totals, send", async ({ page }) => {
   watch(page);
   await login(page, QA_ACCOUNTS.owner);
+  await page.goto("/patients");
+  await page.getByRole("button", { name: "Add patient" }).first().click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Full name").fill(PATIENT);
+  await dialog.getByLabel("Phone").fill("09171234567");
+  await dialog.getByRole("button", { name: "Add patient" }).click();
+  await expect(page).toHaveURL(/\/patients\/[0-9a-f-]{36}/, { timeout: 60_000 });
   await page.goto("/invoices/new");
   await expectNoHorizontalOverflow(page);
   // empty submit
   await page.getByRole("button", { name: "Create and send" }).click();
   await expect(page.getByText(/Choose a patient|Add at least one item/).first()).toBeVisible({ timeout: 60_000 });
-  console.log("EMPTY:", (await page.locator("main").innerText()).match(/(Choose a patient|Add at least one item|check the highlighted)[^\n]*/g));
-  await pickPatient(page, "QA Validation Patient 01");
+  await pickPatient(page, PATIENT);
   await page.locator("input[name=itemDescription]").first().fill("VERIFY consult");
   await page.locator("input[name=itemPrice]").first().fill("1000.505");
   await page.getByRole("button", { name: "Create and send" }).click();
@@ -71,14 +79,15 @@ test("create invoice: validation, totals, send", async ({ page }) => {
   await page.getByLabel("Due date").fill("2020-01-01");
   await page.getByRole("button", { name: "Create and send" }).click();
   await expect(page.getByText(/Due date cannot be before/i).first()).toBeVisible({ timeout: 60_000 });
-  console.log("values kept after error:", await page.getByLabel("Tax (₱)").inputValue(), await page.locator("input[name=itemDescription]").first().inputValue());
+  // Values are kept after a validation error.
+  await expect(page.getByLabel("Tax (₱)")).toHaveValue("10");
+  await expect(page.locator("input[name=itemDescription]").first()).toHaveValue("VERIFY consult");
   const due = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
   await page.getByLabel("Due date").fill(due);
   await page.getByRole("button", { name: "Create and send" }).click();
   await expect(page).toHaveURL(/\/invoices\/[0-9a-f-]{36}/, { timeout: 60_000 });
   invoiceUrl = page.url();
   const body = await page.locator("main").innerText();
-  console.log("INVOICE:", body.replace(/\n+/g, " | ").slice(0, 900));
   expect(body).toContain("₱2,000.20");
   expect(body).toContain("₱2,010.15");
   await expectNoHorizontalOverflow(page);
@@ -113,7 +122,6 @@ test("record payments: negatives, partial, overpay, pdf, void rules", async ({ p
   await submit("500.25", async () => { await d.getByLabel("Date received").fill(new Date().toISOString().slice(0, 10)); await d.getByLabel(/Reference/).fill("VERIFY ref 1"); });
   await expect(d).toBeHidden({ timeout: 60_000 });
   let body = await page.locator("main").innerText();
-  console.log("AFTER PARTIAL:", body.replace(/\n+/g, " | ").slice(-700));
   expect(body).toContain("₱1,509.90");
   expect(body).toContain("VERIFY ref 1");
   // void must be unavailable with payment
@@ -136,7 +144,6 @@ test("record payments: negatives, partial, overpay, pdf, void rules", async ({ p
   await expect(page.getByText("Paid in full")).toBeVisible({ timeout: 60_000 });
   await page.reload();
   body = await page.locator("main").innerText();
-  console.log("AFTER FULL:", body.replace(/\n+/g, " | ").slice(-800));
   expect(body).toContain("₱2,010.15");
   await expect(page.getByRole("button", { name: "Record payment" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Void invoice" })).toHaveCount(0);
@@ -150,33 +157,32 @@ test("lists consistent, roles", async ({ page, browser }) => {
   await page.goto("/invoices?filter=paid");
   await expect(page.getByRole("link", { name: "View receipt" }).first()).toBeVisible();
   await page.goto("/invoices?filter=open&page=999");
-  console.log("PAGE999:", (await page.locator("main").innerText()).match(/Showing[^\n]*/)?.[0]);
+  await expect(page.locator("main")).toBeVisible();
   const open = await (async () => { await page.goto("/invoices"); return tileCents(page, "Open"); })();
   await page.goto("/dashboard");
   expect(await tileCents(page, "Outstanding")).toBe(open);
-  // doctor
+  // Doctor: no billing access. Pages redirect to the dashboard, the PDF API refuses.
   const ctx = await browser.newContext();
   const dp = await ctx.newPage();
   watch(dp);
   await login(dp, QA_ACCOUNTS.doctor);
   for (const u of ["/invoices", "/invoices/new", "/payments", invoiceUrl]) {
     await dp.goto(u);
-    console.log("DOCTOR", u.slice(-20), dp.url().replace("http://localhost:3000", ""), (await dp.locator("main").innerText().catch(() => "")).slice(0, 60).replace(/\n/g, " "));
+    await expect(dp, `doctor ${u}`).toHaveURL(/\/dashboard$/, { timeout: 60_000 });
   }
   const r = await dp.request.get(invoiceUrl.replace("/invoices/", "/api/invoices/") + "/pdf");
-  console.log("DOCTOR pdf", r.status());
+  expect(r.status()).toBe(403);
   await ctx.close();
-  // receptionist can record
+  // Receptionist: invoices yes, payments no.
   const ctx2 = await browser.newContext();
   const rp = await ctx2.newPage();
   watch(rp);
   await login(rp, QA_ACCOUNTS.receptionist);
   await rp.goto("/invoices");
-  console.log("RECEP invoices ok", rp.url(), await rp.getByRole("heading", { name: "Invoices" }).count());
+  await expect(rp).toHaveURL(/\/invoices$/);
+  await expect(rp.getByRole("heading", { name: "Invoices" })).not.toHaveCount(0);
   await rp.goto("/payments");
-  console.log("RECEP payments", rp.url());
-  await rp.goto("/dashboard");
-  console.log("RECEP dash money tiles", await rp.getByText("Outstanding", { exact: true }).count(), await rp.getByText("Collected today").count());
+  await expect(rp).toHaveURL(/\/dashboard$/, { timeout: 60_000 });
   await ctx2.close();
-  console.log("BAD", JSON.stringify(bad));
+  expect(bad).toEqual([]);
 });

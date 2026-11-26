@@ -27,12 +27,13 @@ function Unavailable() {
 /** Public page: no login. Shows only the clinic's name. */
 export default async function PublicChatPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  if (!serverEnv().SUPABASE_SERVICE_ROLE_KEY) return <Unavailable />;
+  // While chat is disabled (live AI is off by default, or the service key is missing) every slug gets
+  // the same page and no clinic is looked up, so slugs cannot be enumerated. Only an enabled chat
+  // looks up the clinic and returns 404 for an unknown slug.
+  if (!serverEnv().SUPABASE_SERVICE_ROLE_KEY || !chatConfigured().ok) return <Unavailable />;
   const svc = createServiceClient();
   const clinic = await getClinicBySlug(svc, slug);
   if (!clinic) notFound();
-  // Live AI is off by default: the page says so and never loads clinic hours or any clinic data.
-  if (!chatConfigured().ok) return <Unavailable />;
   const open = await isClinicOpenNow(svc, clinic);
   return (
     <main className="bg-canvas min-h-screen">

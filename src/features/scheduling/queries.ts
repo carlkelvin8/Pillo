@@ -26,7 +26,7 @@ export async function listBranches(clinicId: string): Promise<Branch[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("branches")
-    .select("id, name, address, phone, latitude, longitude")
+    .select("id, name, address, phone, latitude, longitude, hours_saved_at")
     .eq("clinic_id", clinicId)
     .order("created_at", { ascending: true });
   check(error, "branches");

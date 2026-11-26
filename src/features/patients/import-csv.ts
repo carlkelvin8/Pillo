@@ -7,6 +7,14 @@ const HEADERS = ["full_name", "phone", "email", "birthdate", "sex"] as const;
 export type PatientImportRow = { full_name: string; phone: string | null; email: string | null; birthdate: string | null; sex: "female" | "male" | "other" | null; consent_at: null };
 export type PatientCsvResult = { rows: PatientImportRow[]; errors: { row: number; message: string }[]; total: number };
 
+/** Dedup key for imports: name trimmed, lowercased, inner spaces collapsed; phone as digits with +63 read as 0. */
+export function patientDedupKey(name: string, phone: string | null): string {
+  const n = name.trim().toLowerCase().replace(/\s+/g, " ");
+  let digits = (phone ?? "").replace(/\D/g, "");
+  if (digits.length === 12 && digits.startsWith("63")) digits = `0${digits.slice(2)}`;
+  return `${n}|${digits}`;
+}
+
 function records(text: string): string[][] {
   const output: string[][] = [];
   let row: string[] = [], cell = "", quoted = false;

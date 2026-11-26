@@ -7,7 +7,7 @@ function Block({ className = "" }: { className?: string }) {
 /** Shared App Router fallback. It reserves page structure while authenticated data loads. */
 export function PageSkeleton() {
   return (
-    <main aria-label="Loading page" aria-busy="true" className="flex flex-col gap-6">
+    <div role="status" aria-label="Loading page" aria-busy="true" className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 py-2">
         <Block className="h-4 w-28" />
         <Block className="h-10 w-64 max-w-full" />
@@ -43,6 +43,6 @@ export function PageSkeleton() {
           </div>
         ))}
       </div>
-    </main>
+    </div>
   );
 }

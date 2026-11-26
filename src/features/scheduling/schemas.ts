@@ -73,6 +73,8 @@ export const branchRowSchema = z.object({
   phone: z.string().nullable(),
   latitude: z.number().nullable(),
   longitude: z.number().nullable(),
+  /** Set when the owner saved the weekly hours (even all closed), so the editor stops suggesting hours. */
+  hours_saved_at: z.string().nullable().optional(),
 });
 export type Branch = z.infer<typeof branchRowSchema>;
 

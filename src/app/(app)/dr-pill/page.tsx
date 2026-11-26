@@ -13,6 +13,7 @@ import {
   ReplyThread,
 } from "@/features/assistant/components/inbox-controls";
 import {
+  CONVERSATION_PAGE_SIZE,
   conversationMessages,
   getConversation,
   lastMessages,
@@ -125,6 +126,7 @@ export default async function InboxPage({ searchParams }: Props) {
           ) : (
             <ConversationList
               key={filter}
+              pageSize={CONVERSATION_PAGE_SIZE}
               initialItems={list.map((conversation) => ({
                 id: conversation.id,
                 status: conversation.status,

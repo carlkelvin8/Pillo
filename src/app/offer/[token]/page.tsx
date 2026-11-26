@@ -107,10 +107,9 @@ export default async function OfferPage({
         body="We'll keep you on the waitlist for the next opening."
       />
     );
-  if (
-    r === "taken" &&
-    (view.state === "expired" || (view.state === "closed" && view.status === "expired"))
-  )
+  // "taken" only for the taken path (the accept flow marked this offer 'expired' because the slot was
+  // filled), never for an offer that merely timed out (still 'sent', past its expiry).
+  if (r === "taken" && view.state === "closed" && view.status === "expired")
     return (
       <Shell
         mood="sleepy"

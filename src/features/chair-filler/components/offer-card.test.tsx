@@ -47,4 +47,12 @@ describe("OfferActions copy button", () => {
     const area = screen.getByLabelText(/Message to send/) as HTMLTextAreaElement;
     expect(document.activeElement).toBe(area);
   });
+
+  it("falls back to selecting the text when navigator.clipboard is undefined", async () => {
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+    const copy = await approve();
+    fireEvent.click(copy);
+    expect(await screen.findByText(/Selected\. Press Ctrl\+C/)).toBeInTheDocument();
+    expect(document.activeElement).toBe(screen.getByLabelText(/Message to send/));
+  });
 });

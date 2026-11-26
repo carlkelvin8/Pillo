@@ -17,7 +17,7 @@ async function clinicTimezone(db: McpQueryDb, clinicId: string): Promise<string>
   const [row] = await db.execute(
     sql`select timezone from public.clinics where id=${clinicId} limit 1`,
   );
-  if (!row || typeof row.timezone !== "string") throw new Error("Clinic not found.");
+  if (!row || typeof row.timezone !== "string") throw new McpToolError("Clinic not found.");
   return row.timezone;
 }
 
@@ -93,7 +93,15 @@ async function assertOpenSlot(
       args.startsAt,
     )
   )
-    throw new Error("That time is not an available appointment slot.");
+    throw new McpToolError("That time is not an available appointment slot.");
+}
+
+/** An error whose message is written for MCP clients. Only these messages are ever returned. */
+export class McpToolError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "McpToolError";
+  }
 }
 
 const GENERIC_MESSAGE = "The request could not be completed.";
@@ -108,13 +116,13 @@ function pgCode(error: unknown): string | undefined {
 }
 
 /**
- * Message safe to show an MCP client: our own Errors pass through, database errors are mapped.
- * Drizzle wraps driver errors ("Failed query: ... params: ...") and keeps the SQLSTATE on `cause`.
+ * Message safe to show an MCP client. Only McpToolError messages (written for clients) pass through;
+ * a double-booking (SQLSTATE 23P01, which Drizzle keeps on `cause`) is mapped; everything else
+ * (driver errors such as CONNECT_TIMEOUT, configuration errors, any other Error) is generic.
  */
 export function safeToolMessage(error: unknown): string {
-  const code = pgCode(error);
-  if (code) return code === "23P01" ? "That time is no longer available." : GENERIC_MESSAGE;
-  if (error instanceof Error && !/^Failed query:/i.test(error.message)) return error.message;
+  if (error instanceof McpToolError) return error.message;
+  if (pgCode(error) === "23P01") return "That time is no longer available.";
   return GENERIC_MESSAGE;
 }
 
@@ -147,7 +155,7 @@ async function run<T>(auth: McpAuth, tool: string, work: (db: McpQueryDb) => Pro
 }
 
 function requireScope(auth: McpAuth, scope: string) {
-  if (!auth.scopes.includes(scope)) throw new Error(`This token needs the ${scope} scope.`);
+  if (!auth.scopes.includes(scope)) throw new McpToolError(`This token needs the ${scope} scope.`);
 }
 
 export function buildMcpServer(auth: McpAuth) {
@@ -171,7 +179,7 @@ export function buildMcpServer(auth: McpAuth) {
           input.to < input.from ||
           (Date.parse(input.to) - Date.parse(input.from)) / 86_400_000 > 31
         )
-          throw new Error("Choose a date range of 31 days or less.");
+          throw new McpToolError("Choose a date range of 31 days or less.");
         const tz = await clinicTimezone(db, auth.clinicId);
         const { start } = dayBoundsUtc(input.from, tz);
         const { end } = dayBoundsUtc(input.to, tz);
@@ -219,7 +227,7 @@ export function buildMcpServer(auth: McpAuth) {
         select id, patient_number, full_name, birthdate, sex, phone, email
         from public.patients where clinic_id = ${auth.clinicId} and id = ${input.patient_id} limit 1
       `);
-        if (!patient) throw new Error("Patient not found.");
+        if (!patient) throw new McpToolError("Patient not found.");
         const appointments = await db.execute(sql`
         select id, starts_at, ends_at, status, doctor_id, branch_id
         from public.appointments where clinic_id = ${auth.clinicId} and patient_id = ${input.patient_id}
@@ -242,7 +250,7 @@ export function buildMcpServer(auth: McpAuth) {
           input.to < input.from ||
           (Date.parse(input.to) - Date.parse(input.from)) / 86_400_000 > 31
         )
-          throw new Error("Choose a date range of 31 days or less.");
+          throw new McpToolError("Choose a date range of 31 days or less.");
         const tz = await clinicTimezone(db, auth.clinicId);
         const { start } = dayBoundsUtc(input.from, tz);
         const { end } = dayBoundsUtc(input.to, tz);
@@ -309,7 +317,7 @@ export function buildMcpServer(auth: McpAuth) {
           sql`select id, starts_at, ends_at, status, doctor_id, branch_id from public.appointments where clinic_id=${auth.clinicId} and id=${input.appointment_id} limit 1`,
         );
         if (!current || !["scheduled", "confirmed"].includes(String(current.status)))
-          throw new Error("Appointment cannot be rescheduled.");
+          throw new McpToolError("Appointment cannot be rescheduled.");
         const duration =
           new Date(String(current.ends_at)).getTime() -
           new Date(String(current.starts_at)).getTime();
@@ -357,7 +365,7 @@ export function buildMcpServer(auth: McpAuth) {
         const [invoice] = await db.execute(
           sql`insert into public.invoices (clinic_id, patient_id, due_on) values (${auth.clinicId}, ${input.patient_id}, ${input.due_on}) returning id, invoice_number, status`,
         );
-        if (!invoice) throw new Error("Invoice creation failed.");
+        if (!invoice) throw new McpToolError("Invoice creation failed.");
         for (const [position, item] of input.items.entries())
           await db.execute(
             sql`insert into public.invoice_items (clinic_id, invoice_id, position, description, quantity, unit_price_centavos) values (${auth.clinicId}, ${invoice.id}, ${position}, ${item.description}, ${item.quantity}, ${item.unit_price_centavos})`,
@@ -376,17 +384,17 @@ export function buildMcpServer(auth: McpAuth) {
       run(auth, "request_payment", async (db) => {
         requireScope(auth, "payments:request");
         if (!onlinePaymentsEnabled())
-          throw new Error("Online payment requests are not available yet.");
+          throw new McpToolError("Online payment requests are not available yet.");
         const [invoice] = await db.execute(
           sql`select id, invoice_number, total_centavos, status from public.invoices where clinic_id=${auth.clinicId} and id=${input.invoice_id} limit 1`,
         );
         if (!invoice || !["draft", "sent"].includes(String(invoice.status)))
-          throw new Error("Invoice is not payable.");
+          throw new McpToolError("Invoice is not payable.");
         const [paymentTotals] = await db.execute(
           sql`select coalesce(sum(amount_centavos), 0)::bigint as paid_centavos from public.payments where clinic_id=${auth.clinicId} and invoice_id=${input.invoice_id} and status='succeeded'`,
         );
         const due = Number(invoice.total_centavos) - Number(paymentTotals?.paid_centavos ?? 0);
-        if (due <= 0) throw new Error("Invoice has no outstanding balance.");
+        if (due <= 0) throw new McpToolError("Invoice has no outstanding balance.");
         const [proposal] = await db.execute(sql`
         insert into public.agent_actions (clinic_id, kind, status, autonomy, payload, outcome)
         values (${auth.clinicId}, 'mcp_request_payment', 'proposed', 'approve', jsonb_build_object('invoice_id', ${input.invoice_id}), 'Waiting for staff approval')

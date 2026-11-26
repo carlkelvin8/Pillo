@@ -67,6 +67,7 @@ describe("ConversationList", () => {
         ]}
         initialTotal={2}
         filter="all"
+        pageSize={1}
       />,
     );
 
@@ -99,6 +100,7 @@ describe("ConversationList", () => {
         initialItems={[item("a", "needs_human"), item("b", "open")]}
         initialTotal={2}
         filter="all"
+        pageSize={20}
       />,
     );
     expect(screen.getByText("Needs a human")).toBeInTheDocument();
@@ -107,14 +109,78 @@ describe("ConversationList", () => {
         initialItems={[item("a", "resolved"), item("b", "open")]}
         initialTotal={2}
         filter="all"
+        pageSize={20}
       />,
     );
     expect(screen.queryByText("Needs a human")).toBeNull();
     expect(screen.getByText("Resolved")).toBeInTheDocument();
     // Dropped from a filtered first page: the row disappears instead of lingering.
     rerender(
-      <ConversationList initialItems={[item("b", "open")]} initialTotal={1} filter="needs" />,
+      <ConversationList
+        initialItems={[item("b", "open")]}
+        initialTotal={1}
+        filter="needs"
+        pageSize={20}
+      />,
     );
     expect(screen.queryByText("Chat a")).toBeNull();
+  });
+
+  it("keeps a row pushed off the first page by a new conversation, without duplicates", async () => {
+    const item = (id: string) => ({
+      id,
+      status: "open" as const,
+      handledBy: "ai" as const,
+      label: `Chat ${id}`,
+      time: "9:00 AM",
+      preview: "hello",
+    });
+    mock.loadMore.mockResolvedValueOnce({ items: [item("c"), item("d")], total: 5, hasMore: true });
+    const { rerender } = render(
+      <ConversationList
+        initialItems={[item("a"), item("b")]}
+        initialTotal={5}
+        filter="all"
+        pageSize={2}
+      />,
+    );
+    await act(async () => {
+      intersectionCallback?.(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      );
+    });
+    expect(mock.loadMore).toHaveBeenLastCalledWith(2, "all");
+    expect(await screen.findByText("Chat d")).toBeInTheDocument();
+
+    // A new conversation arrives: "b" is pushed off page 1 but must stay in the list.
+    rerender(
+      <ConversationList
+        initialItems={[item("n"), item("a")]}
+        initialTotal={6}
+        filter="all"
+        pageSize={2}
+      />,
+    );
+    const labels = screen
+      .getAllByRole("link")
+      .map((link) => link.textContent?.match(/Chat (\w)/)?.[1]);
+    expect(labels).toEqual(["n", "a", "b", "c", "d"]);
+
+    // Next load continues from the distinct loaded rows (5 rows, page size 2 -> page 3).
+    mock.loadMore.mockResolvedValueOnce({
+      items: [item("d"), item("e")],
+      total: 6,
+      hasMore: false,
+    });
+    await act(async () => {
+      intersectionCallback?.(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      );
+    });
+    expect(mock.loadMore).toHaveBeenLastCalledWith(3, "all");
+    expect(await screen.findByText("Chat e")).toBeInTheDocument();
+    expect(screen.getAllByText("Chat d")).toHaveLength(1);
   });
 });

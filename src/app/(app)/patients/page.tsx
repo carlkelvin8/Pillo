@@ -45,7 +45,8 @@ export default async function PatientsPage({ searchParams }: Props) {
   const tz = membership.clinic.timezone;
   const clinicId = membership.clinic.id;
   const filter: PatientListFilter = params.filter === "new" ? "new" : "all";
-  const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
+  // Capped so a huge ?page= cannot produce an absurd range; the last-page redirect below still applies.
+  const page = Math.min(100_000, Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1));
   const q = (params.q ?? "").slice(0, 60);
 
   const today = todayIn(tz);

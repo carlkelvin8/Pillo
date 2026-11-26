@@ -20,6 +20,8 @@ import { formatPHP } from "@/lib/money";
 import { dateOf, formatDateShort, formatTime, todayIn, zonedToUtcIso } from "@/lib/datetime";
 
 export const metadata: Metadata = { title: "Dr. Pill activity" };
+const MAX_ACTIVITY_PAGE = 100_000;
+
 type Props = { searchParams: Promise<{ page?: string }> };
 
 const KIND_LABEL: Record<string, string> = {
@@ -31,7 +33,11 @@ const KIND_LABEL: Record<string, string> = {
 export default async function ActivityPage({ searchParams }: Props) {
   const { membership } = await requireCapability("inbox.view");
   const params = await searchParams;
-  const requestedPage = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
+  // Capped so a huge ?page never turns into an exponent-notation range; past-the-end still redirects.
+  const requestedPage = Math.min(
+    MAX_ACTIVITY_PAGE,
+    Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1),
+  );
   const clinic = membership.clinic;
   const tz = clinic.timezone;
   const today = todayIn(tz);

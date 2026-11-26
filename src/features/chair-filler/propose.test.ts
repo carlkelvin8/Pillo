@@ -29,7 +29,13 @@ function fake(t: Tables, upsertError: { code: string } | null = null) {
   const upsert = vi.fn();
   const statusFilters: unknown[] = [];
   const chain = (table: string) => {
-    const result = { data: t[table] ?? [], count: (t.count as number) ?? 0, error: null };
+    const errors = (t.errors ?? {}) as Record<string, { code: string } | undefined>;
+    const failed = errors[table] ?? null;
+    const result = {
+      data: failed ? null : (t[table] ?? []),
+      count: (t.count as number) ?? 0,
+      error: failed,
+    };
     const q: Record<string, unknown> = {};
     for (const m of ["select", "eq", "gte", "lt", "gt"]) q[m] = () => q;
     q.in = (col: string, values: unknown) => {
@@ -68,6 +74,24 @@ const run = (c: SupabaseClient) =>
   proposeOffers(c, { clinicId: U(50), appointmentId: U(1), tz: "Asia/Manila", now: NOW });
 
 describe("proposeOffers", () => {
+  it("offers the freed old time when an appointment was rescheduled", async () => {
+    const f = fake(base());
+    const freed = { startsAt: "2027-01-14T08:00:00Z", endsAt: "2027-01-14T08:30:00Z" };
+    await proposeOffers(f.client, {
+      clinicId: U(50),
+      appointmentId: U(1),
+      tz: "Asia/Manila",
+      now: NOW,
+      freed,
+    });
+    const rows = f.upsert.mock.calls[0]![0] as { starts_at: string; ends_at: string }[];
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.starts_at).toBe(freed.startsAt);
+      expect(row.ends_at).toBe(freed.endsAt);
+    }
+  });
+
   it("proposes an offer per consented candidate", async () => {
     const f = fake(base());
     expect(await run(f.client)).toBe(2);
@@ -104,4 +128,18 @@ describe("proposeOffers", () => {
     expect(spy).toHaveBeenCalledWith(expect.stringContaining("42P01"));
     spy.mockRestore();
   });
+  it.each(["patients", "appointments"])(
+    "drafts nothing and logs only the code when the %s lookup fails",
+    async (table) => {
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const f = fake(base({ errors: { [table]: { code: "57014", message: "secret detail" } } }));
+      expect(await run(f.client)).toBe(0);
+      expect(f.upsert).not.toHaveBeenCalled();
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy.mock.calls[0]).toHaveLength(1);
+      expect(spy.mock.calls[0]![0]).toContain("57014");
+      expect(spy.mock.calls[0]![0]).not.toContain("secret");
+      spy.mockRestore();
+    },
+  );
 });

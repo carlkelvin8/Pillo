@@ -182,6 +182,16 @@ export async function rescheduleAppointmentAction(
     "appointment",
     parsed.data.appointmentId,
   );
+  // The old time is now free: offer it to the waitlist like a cancellation would (never throws).
+  if (appt.starts_at !== startsAt.toISOString()) {
+    await proposeOffers(supabase, {
+      clinicId: ctx.clinic.id,
+      appointmentId: parsed.data.appointmentId,
+      tz,
+      freed: { startsAt: appt.starts_at, endsAt: appt.ends_at },
+    });
+    revalidatePath("/dr-pill/activity");
+  }
   revalidatePath("/appointments");
   return { ok: true, message: "Appointment moved." };
 }
@@ -242,6 +252,9 @@ export async function setAppointmentStatusAction(
   };
 }
 
+const ALREADY_WAITLISTED =
+  "This patient is already on the waitlist. Remove the old entry first to change it.";
+
 export async function addWaitlistAction(
   _prev: ActionState,
   formData: FormData,
@@ -260,18 +273,17 @@ export async function addWaitlistAction(
 
   const supabase = await createClient();
   // One active entry per patient: a second one would only double-list them (and double-submit would add twice).
-  const { data: existing } = await supabase
+  // The unique index waitlist_one_active_per_patient backs this up against concurrent submits (23505).
+  const { data: existing, error: existingError } = await supabase
     .from("waitlist_entries")
     .select("id")
     .eq("clinic_id", ctx.clinic.id)
     .eq("patient_id", parsed.data.patientId)
     .in("status", ["waiting", "offered"])
     .limit(1);
-  if (existing?.length)
-    return {
-      message: "This patient is already on the waitlist. Remove the old entry first to change it.",
-      values: echo(formData, ["reason"]),
-    };
+  if (existingError)
+    return { message: "We could not add to the waitlist.", values: echo(formData, ["reason"]) };
+  if (existing?.length) return { message: ALREADY_WAITLISTED, values: echo(formData, ["reason"]) };
   const { data, error } = await supabase
     .from("waitlist_entries")
     .insert({
@@ -283,6 +295,7 @@ export async function addWaitlistAction(
       outreach_ok: parsed.data.outreachOk,
     })
     .select("id");
+  if (error?.code === "23505") return { message: ALREADY_WAITLISTED, values: echo(formData, ["reason"]) };
   if (error || !data?.length)
     return { message: "We could not add to the waitlist.", values: echo(formData, ["reason"]) };
 

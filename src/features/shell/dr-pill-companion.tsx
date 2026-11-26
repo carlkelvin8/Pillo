@@ -53,6 +53,7 @@ export function DrPillCompanion({ role }: { role: Role }) {
   const [position, setPosition] = useState<Position | null>(null);
   const dragStartRef = useRef<DragStart | null>(null);
   const draggedRef = useRef(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
   const instructionsId = useId();
   const groups = navForRole(role);
@@ -103,11 +104,14 @@ export function DrPillCompanion({ role }: { role: Role }) {
     };
   }, []);
 
-  // Escape closes the help panel, like every other popover in the app.
+  // Escape closes the help panel, like every other popover in the app, and returns focus to the
+  // toggle. An Escape already handled elsewhere (e.g. by a dialog) is left alone.
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      setOpen(false);
+      toggleRef.current?.focus();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -243,6 +247,7 @@ export function DrPillCompanion({ role }: { role: Role }) {
         </section>
       ) : null}
       <button
+        ref={toggleRef}
         type="button"
         className="group text-ink focus-visible:outline-ink relative isolate grid size-24 cursor-grab touch-none place-items-center rounded-full bg-transparent p-0 transition-transform duration-200 select-none hover:scale-105 active:scale-95 active:cursor-grabbing motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
         aria-expanded={open}

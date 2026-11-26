@@ -6,20 +6,6 @@ import type { McpActivityItem } from "../activity";
 import { MCP_SCOPE_CATALOG, MCP_TOOL_CATALOG } from "../catalog";
 import { CopyEndpointButton } from "./copy-endpoint-button";
 
-function EndpointCopy({ endpoint }: { endpoint: string }) {
-  return (
-    <div className="flex flex-col gap-2 sm:flex-row">
-      <code
-        className="rounded-control border-line-strong bg-surface text-ink min-w-0 flex-1 overflow-x-auto border px-4 py-3 font-mono text-sm"
-        aria-label="MCP endpoint URL"
-      >
-        {endpoint}
-      </code>
-      <CopyEndpointButton endpoint={endpoint} />
-    </div>
-  );
-}
-
 export function IntegrationsOverview({
   endpoint,
   databaseConfigured,
@@ -57,13 +43,14 @@ export function IntegrationsOverview({
         <div className="flex flex-col gap-2">
           <p className="text-surface/80 text-sm font-medium">Endpoint URL</p>
           <div id="mcp-endpoint">
-            <EndpointCopy endpoint={endpoint} />
+            <CopyEndpointButton endpoint={endpoint} />
           </div>
         </div>
         {!databaseConfigured ? (
           <p className="text-surface/80 flex items-start gap-2 text-sm">
             <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-            Configure the server-only DATABASE_URL before MCP clients can connect. Keep database
+            Configure the server-only DATABASE_URL_MCP (a connection as the least-privilege
+            pillo_mcp role, required in production) before MCP clients can connect. Keep database
             credentials out of browser code.
           </p>
         ) : null}

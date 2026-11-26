@@ -12,7 +12,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import type { SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { APP_NAME } from "@/config/brand";
-import { buildMcpServer, safeToolMessage } from "./server";
+import { buildMcpServer, McpToolError, safeToolMessage } from "./server";
 import type { McpAuth } from "./auth";
 
 const auth: McpAuth = { tokenId: "token-id", clinicId: "clinic-id", scopes: [] };
@@ -137,16 +137,14 @@ describe("MCP Streamable HTTP server", () => {
   });
 
   it("returns clinic-filtered schedule facts for an allowed date range", async () => {
-    execute
-      .mockResolvedValueOnce([{ timezone: "Asia/Manila" }])
-      .mockResolvedValueOnce([
-        {
-          id: "appointment-id",
-          patient_id: "patient-id",
-          starts_at: "2026-11-25T02:00:00.000Z",
-          status: "scheduled",
-        },
-      ]);
+    execute.mockResolvedValueOnce([{ timezone: "Asia/Manila" }]).mockResolvedValueOnce([
+      {
+        id: "appointment-id",
+        patient_id: "patient-id",
+        starts_at: "2026-11-25T02:00:00.000Z",
+        status: "scheduled",
+      },
+    ]);
     const response = await post(
       { ...auth, scopes: ["appointments:read"] },
       {
@@ -525,10 +523,19 @@ describe("MCP Streamable HTTP server", () => {
 });
 
 describe("safeToolMessage", () => {
-  it("passes our own errors through and maps database errors", () => {
-    expect(safeToolMessage(new Error("This token needs the x scope."))).toBe(
+  it("passes only McpToolError messages through and maps database errors", () => {
+    expect(safeToolMessage(new McpToolError("This token needs the x scope."))).toBe(
       "This token needs the x scope.",
     );
+    // Any other Error never reaches the client, whatever it says.
+    expect(safeToolMessage(new Error("DATABASE_URL_MCP is not set"))).toBe(
+      "The request could not be completed.",
+    );
+    expect(
+      safeToolMessage(
+        Object.assign(new Error("write CONNECT_TIMEOUT db:5432"), { code: "CONNECT_TIMEOUT" }),
+      ),
+    ).toBe("The request could not be completed.");
     expect(safeToolMessage(Object.assign(new Error("exclusion violated"), { code: "23P01" }))).toBe(
       "That time is no longer available.",
     );

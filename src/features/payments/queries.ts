@@ -63,7 +63,10 @@ export async function listTransactions(
     })
     .eq("clinic_id", clinicId)
     .in("status", ["succeeded", "pending"])
-    .order("created_at", { ascending: false });
+    // Newest money first by the date it was received; unpaid (pending) links go last. Stable paging.
+    .order("paid_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false });
   if (filter === "pending") query = query.eq("status", "pending");
   if (paginated) {
     const from = (page - 1) * TRANSACTION_PAGE_SIZE;

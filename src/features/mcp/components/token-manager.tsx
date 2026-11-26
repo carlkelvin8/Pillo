@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
@@ -13,6 +13,7 @@ import { formatDateShort, dateOf } from "@/lib/datetime";
 import { MCP_SCOPE_CATALOG } from "../catalog";
 import { MCP_EXPIRY_DAYS, tokenState } from "../expiry";
 import { Select } from "@/components/ui/input";
+import { COPY_STATUS_TEXT, useCopyText } from "./use-copy-text";
 
 type Token = {
   id: string;
@@ -26,7 +27,7 @@ type Token = {
 
 function CreateToken() {
   const [state, action] = useActionState<ActionState, FormData>(createMcpTokenAction, {});
-  const [copied, setCopied] = useState(false);
+  const { target, status, copy } = useCopyText<HTMLInputElement>();
   const token = state.data?.token;
   return (
     <Card className="flex flex-col gap-4">
@@ -83,21 +84,20 @@ function CreateToken() {
             Copy this token now. It cannot be recovered later.
           </p>
           <Input
+            ref={target}
             aria-label="New MCP bearer token"
             readOnly
             value={token}
             onFocus={(event) => event.currentTarget.select()}
           />
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={async () => {
-              await navigator.clipboard.writeText(token);
-              setCopied(true);
-            }}
-          >
-            {copied ? "Copied" : "Copy token"}
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button type="button" variant="ghost" onClick={() => void copy(token)}>
+              {status === "copied" ? "Copied" : "Copy token"}
+            </Button>
+            <span role="status" className="text-muted text-sm">
+              {status ? COPY_STATUS_TEXT[status] : ""}
+            </span>
+          </div>
         </div>
       ) : null}
     </Card>
