@@ -1,0 +1,786 @@
+/*
+ * Hero: dark and editorial. The headline leads; the real product (an appointments day view) sits below it,
+ * cropped by the first screen, and rises into full view as you scroll. A cancelled slot is refilled once.
+ * Colours come from the design tokens in globals.css.
+ */
+
+.story-hero-scene .story-stage {
+  justify-content: flex-start;
+  align-items: stretch;
+  padding-top: clamp(5.25rem, 11vh, 6.75rem);
+}
+
+/* hairline columns: quiet structure behind the type */
+.hx-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--color-surface) 6%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: calc(100% / 8) 100%;
+  -webkit-mask-image: linear-gradient(to bottom, rgb(0 0 0) 0%, rgb(0 0 0) 40%, transparent 90%);
+  mask-image: linear-gradient(to bottom, rgb(0 0 0) 0%, rgb(0 0 0) 40%, transparent 90%);
+}
+
+/* ---------- copy ---------- */
+.hx-copy {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.9rem, 2.2vh, 1.4rem);
+  width: 100%;
+  max-width: 64rem;
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+  text-align: center;
+  opacity: calc(1 - var(--p) * 1.7);
+  transform: translate3d(0, calc(var(--p) * -60px), 0);
+  filter: blur(calc(var(--p) * 8px));
+}
+.hx-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.9rem;
+  color: var(--color-mint-strong);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  animation: hx-fade-up 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.hx-eyebrow span {
+  width: 2rem;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.6;
+}
+.hx-title {
+  font-size: clamp(2.4rem, min(6vw, 10vh), 5.75rem);
+  font-weight: 600;
+  line-height: 0.96;
+  letter-spacing: -0.055em;
+  text-wrap: balance;
+}
+.hx-title-soft {
+  margin-top: 0.3em;
+  color: color-mix(in srgb, var(--color-surface) 45%, transparent);
+  font-size: 0.6em;
+  font-weight: 500;
+  line-height: 1.12;
+  letter-spacing: -0.04em;
+}
+.story-mask {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
+}
+.story-mask-in {
+  display: inline-block;
+  animation: story-word-up 1s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i) * 80ms + 150ms);
+}
+.hx-sub {
+  max-width: 36rem;
+  color: color-mix(in srgb, var(--color-surface) 68%, transparent);
+  font-size: clamp(0.95rem, 1.5vw, 1.1rem);
+  line-height: 1.5;
+  animation: hx-fade-up 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.75s both;
+}
+.hx-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 1.5rem;
+  animation: hx-fade-up 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.9s both;
+}
+.hx-primary {
+  min-height: 3rem;
+  padding-inline: 1.6rem;
+  font-size: 0.95rem;
+}
+.hx-primary svg {
+  transition: transform 0.2s ease;
+}
+.hx-primary:hover svg {
+  transform: translateX(3px);
+}
+.hx-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+  padding-inline: 0.25rem;
+  color: var(--color-surface);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-surface) 35%, transparent);
+  text-underline-offset: 0.35em;
+  transition: text-decoration-color 0.2s;
+}
+.hx-link:hover {
+  text-decoration-color: var(--color-mint-strong);
+}
+.hx-link svg {
+  width: 1rem;
+  height: 1rem;
+}
+.hx-note {
+  color: color-mix(in srgb, var(--color-surface) 52%, transparent);
+  font-size: 0.78rem;
+  animation: hx-fade-up 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 1.05s both;
+}
+
+/* ---------- product window ---------- */
+.hx-stage {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: clamp(1.75rem, 4vh, 3rem);
+  padding-inline: 1.5rem;
+}
+.hx-window-wrap {
+  position: relative;
+  width: min(100%, 66rem);
+  transform: translate3d(0, calc(var(--p) * -36vh), 0);
+}
+.hx-window {
+  --hour: 3rem;
+  display: flex;
+  min-height: 31rem;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-size: 0.74rem;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-surface) 14%, transparent),
+    0 50px 90px -30px rgb(0 0 0 / 0.7);
+  transform-origin: 50% 0;
+  transform: perspective(1600px) rotateX(calc((1 - var(--p)) * 6deg));
+  animation: hx-window-in 1s cubic-bezier(0.2, 0.8, 0.2, 1) 0.45s both;
+}
+.hx-side {
+  display: none;
+  width: 11.5rem;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 0.9rem 0.7rem;
+  border-right: 1px solid var(--color-line);
+}
+@media (min-width: 1024px) {
+  .hx-side {
+    display: flex;
+  }
+}
+.hx-clinic {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.75rem;
+  background: var(--color-subtle);
+}
+.hx-clinic-badge {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 0.5rem;
+  background: var(--color-mint);
+  color: var(--color-mint-ink);
+  font-weight: 600;
+}
+.hx-clinic small {
+  color: var(--color-muted);
+  font-size: 0.52rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+.hx-clinic b {
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+.hx-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.hx-nav-group small {
+  padding: 0 0.5rem 0.25rem;
+  color: var(--color-muted);
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.hx-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.42rem 0.5rem;
+  border-radius: 0.5rem;
+  color: var(--color-ink-2);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.hx-nav svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex-shrink: 0;
+}
+.hx-nav.is-active {
+  background: var(--color-ink);
+  color: var(--color-surface);
+  font-weight: 600;
+}
+.hx-main {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+  background: var(--color-canvas);
+}
+.hx-top {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+.hx-search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 1;
+  max-width: 16rem;
+  margin-right: auto;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.6rem;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.hx-search svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+.hx-bell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.55rem;
+}
+.hx-bell svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+.hx-bell i {
+  position: absolute;
+  right: 0.3rem;
+  top: 0.3rem;
+  width: 0.4rem;
+  height: 0.4rem;
+  border: 1.5px solid var(--color-surface);
+  border-radius: 999px;
+  background: var(--color-danger-chip-ink);
+}
+.hx-avatar {
+  display: grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 999px;
+  background: var(--color-mint);
+  color: var(--color-mint-ink);
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+.hx-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.85rem 0.9rem 0.3rem;
+}
+.hx-head small {
+  color: var(--color-muted);
+  font-size: 0.66rem;
+}
+.hx-head b {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.hx-seg {
+  display: inline-flex;
+  margin-left: auto;
+  padding: 0.12rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.55rem;
+  background: var(--color-surface);
+  font-weight: 500;
+}
+.hx-seg i {
+  padding: 0.18rem 0.6rem;
+  border-radius: 0.4rem;
+  color: var(--color-muted);
+  font-style: normal;
+}
+.hx-seg i.is-on {
+  background: var(--color-subtle);
+  color: var(--color-ink);
+}
+.hx-new {
+  padding: 0.45rem 0.8rem;
+  border-radius: 0.6rem;
+  background: var(--color-ink);
+  color: var(--color-surface);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.hx-cal {
+  display: grid;
+  grid-template-columns: 2.6rem repeat(3, 1fr);
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem 0.9rem 0.4rem;
+}
+.hx-gutter {
+  display: flex;
+  flex-direction: column;
+  padding-top: 1.35rem;
+  color: var(--color-muted);
+  font-size: 0.62rem;
+  text-align: right;
+}
+.hx-gutter span {
+  height: var(--hour);
+  transform: translateY(-0.45em);
+}
+.hx-doc {
+  height: 1.35rem;
+  color: var(--color-ink-2);
+  font-weight: 600;
+}
+.hx-track {
+  position: relative;
+  height: calc(var(--hour) * 7);
+  border-top: 1px solid var(--color-line);
+  background-image: linear-gradient(var(--color-line) 1px, transparent 1px);
+  background-size: 100% var(--hour);
+}
+.hx-blk {
+  position: absolute;
+  inset-inline: 0.15rem;
+  top: calc(var(--t) * var(--hour) + 2px);
+  height: calc(var(--l) * var(--hour) - 4px);
+  display: flex;
+  align-items: flex-start;
+  padding: 0.3rem 0.45rem;
+  overflow: hidden;
+  border-left: 3px solid var(--color-mint-ink);
+  border-radius: 0.4rem;
+  background: var(--color-mint);
+  color: var(--color-mint-ink);
+}
+.hx-blk-wait {
+  border-left-color: var(--color-amber-chip-ink);
+  background: var(--color-amber-chip);
+  color: var(--color-amber-chip-ink);
+}
+.hx-blk-text {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+.hx-blk-text b {
+  grid-area: 1 / 1;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-live {
+  overflow: visible;
+  border-left: 0;
+  background: transparent;
+}
+.hx-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.4rem;
+  opacity: 0;
+}
+.hx-bg-ok {
+  border-left: 3px solid var(--color-mint-ink);
+  background: var(--color-mint);
+  opacity: 1;
+  animation: hx-ok 6.4s linear 1.8s forwards;
+}
+.hx-bg-bad {
+  border-left: 3px solid var(--color-danger-chip-ink);
+  background: var(--color-danger-chip);
+  animation: hx-bad 6.4s linear 1.8s both;
+}
+.hx-bg-open {
+  border: 1.5px dashed var(--color-line-strong);
+  background: var(--color-surface);
+  animation: hx-open 6.4s linear 1.8s both;
+}
+.hx-bg-new {
+  border-left: 3px solid var(--color-mint-ink);
+  background: var(--color-mint-strong);
+  animation: hx-new 6.4s linear 1.8s both;
+}
+.hx-live .hx-blk-text {
+  z-index: 1;
+}
+.hx-l-a {
+  color: var(--color-mint-ink);
+  animation: hx-la 6.4s linear 1.8s forwards;
+}
+.hx-l-b {
+  color: var(--color-muted);
+  opacity: 0;
+  animation: hx-lb 6.4s linear 1.8s both;
+}
+.hx-l-c {
+  color: var(--color-ink);
+  opacity: 0;
+  animation: hx-lc 6.4s linear 1.8s both;
+}
+.hx-tag {
+  position: absolute;
+  right: 0.35rem;
+  bottom: 0.3rem;
+  z-index: 1;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-danger-chip-ink);
+  font-size: 0.58rem;
+  font-weight: 700;
+  opacity: 0;
+  animation: hx-tag 6.4s linear 1.8s both;
+}
+.hx-toast {
+  position: absolute;
+  top: 3.3rem;
+  right: 0.9rem;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.8rem 0.5rem 0.6rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 0.6rem;
+  background: var(--color-surface);
+  box-shadow: 0 10px 24px -8px rgb(10 10 10 / 0.3);
+  animation: hx-toast 6.4s cubic-bezier(0.2, 0.8, 0.2, 1) 1.8s both;
+}
+.hx-toast svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--color-mint-ink);
+}
+.hx-toast b {
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.hx-toast small {
+  color: var(--color-muted);
+  font-size: 0.62rem;
+}
+/* The pinned mascot flies to this spot: it stands on the top-right edge of the window. */
+.hx-spot {
+  position: absolute;
+  top: -6rem;
+  right: 12%;
+  z-index: 3;
+  width: clamp(5.5rem, 7vw, 7rem);
+}
+
+/* ---------- keyframes ---------- */
+@keyframes hx-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes hx-window-in {
+  from {
+    opacity: 0;
+    translate: 0 3rem;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+/* One-shot (6.4s): confirmed -> cancelled -> open slot -> refilled. It rests on "filled". */
+@keyframes hx-ok {
+  0%,
+  20% {
+    opacity: 1;
+  }
+  24%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes hx-bad {
+  0%,
+  20% {
+    opacity: 0;
+  }
+  24%,
+  38% {
+    opacity: 1;
+  }
+  44%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes hx-open {
+  0%,
+  40% {
+    opacity: 0;
+  }
+  46%,
+  68% {
+    opacity: 1;
+  }
+  74%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes hx-new {
+  0%,
+  68% {
+    opacity: 0;
+  }
+  76%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes hx-la {
+  0%,
+  40% {
+    opacity: 1;
+  }
+  46%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes hx-lb {
+  0%,
+  44% {
+    opacity: 0;
+  }
+  50%,
+  68% {
+    opacity: 1;
+  }
+  74%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes hx-lc {
+  0%,
+  68% {
+    opacity: 0;
+  }
+  76%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes hx-tag {
+  0%,
+  20% {
+    opacity: 0;
+  }
+  26%,
+  40% {
+    opacity: 1;
+  }
+  46%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes hx-toast {
+  0%,
+  70% {
+    opacity: 0;
+    transform: translate3d(0, -0.6rem, 0);
+  }
+  78%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- tablets and phones: a lighter window ---------- */
+@media (max-width: 1023px) {
+  .hx-window {
+    min-height: 0;
+  }
+  .hx-gutter span:nth-child(n + 6) {
+    display: none;
+  }
+  .hx-track {
+    height: calc(var(--hour) * 5);
+    overflow: hidden;
+  }
+}
+@media (max-width: 639px) {
+  .hx-title {
+    font-size: clamp(2.1rem, 10.5vw, 3rem);
+  }
+  .hx-top,
+  .hx-seg,
+  .hx-new {
+    display: none;
+  }
+  .hx-window {
+    --hour: 2.5rem;
+  }
+  .hx-cal {
+    grid-template-columns: 2.3rem 1fr 1fr;
+  }
+  .hx-col:last-child {
+    display: none;
+  }
+  .hx-gutter span:nth-child(n + 5) {
+    display: none;
+  }
+  .hx-track {
+    height: calc(var(--hour) * 4);
+  }
+  .hx-toast {
+    top: 3.6rem;
+    right: 0.5rem;
+  }
+  .hx-spot {
+    top: -3.7rem;
+    right: 4%;
+    width: 4rem;
+  }
+  .hx-note {
+    display: none;
+  }
+}
+
+/* phones too short for the window: headline and button first, the mascot stands below them */
+@media (max-width: 639px) and (max-height: 759px) {
+  .hx-window {
+    display: none;
+  }
+  .hx-spot {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: 4.5rem;
+    margin: 0.25rem auto 0;
+  }
+}
+@media (max-width: 639px) and (max-height: 650px) {
+  .hx-title {
+    font-size: clamp(1.85rem, 9.5vw, 2.3rem);
+  }
+  .hx-sub {
+    font-size: 0.875rem;
+  }
+  .hx-spot {
+    width: 3.5rem;
+  }
+}
+
+/* landscape phones: headline and button only */
+@media (orientation: landscape) and (max-height: 520px) {
+  .story-hero-scene .story-stage {
+    padding-top: 5rem;
+  }
+  .hx-title {
+    font-size: clamp(1.7rem, 9vh, 2.6rem);
+  }
+  .hx-sub,
+  .hx-note,
+  .hx-window {
+    display: none;
+  }
+  .hx-copy {
+    gap: 0.6rem;
+  }
+  .hx-spot {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: 3.5rem;
+    margin: 0 auto;
+  }
+}
+
+/* short desktop windows: keep the button inside the first screen */
+@media (min-width: 1024px) and (max-height: 720px) {
+  .hx-note {
+    display: none;
+  }
+  .hx-sub {
+    font-size: 0.92rem;
+  }
+}
+
+/* ---------- reduced motion and old webviews: no scrubbing, everything rests on its finished state ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .hx *,
+  .hx-eyebrow,
+  .hx-sub,
+  .hx-cta,
+  .hx-note {
+    animation-delay: 0s !important;
+  }
+  .hx-copy,
+  .hx-window-wrap,
+  .hx-window {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+.story-root[data-motion="reduced"] :is(.hx-copy, .hx-window-wrap, .hx-window) {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+.story-root[data-compact="true"] .story-hero-scene .story-stage {
+  /* the hero keeps its own pinned layout on short screens */
+  justify-content: flex-start;
+}

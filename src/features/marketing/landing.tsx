@@ -10,6 +10,7 @@ import { HeroScene, MarqueeBands } from "./scenes/hero";
 import { LedgerScene } from "./scenes/ledger";
 import { StoryRoot } from "./story/story-root";
 import "./story.css";
+import "./hero.css";
 
 const CHAPTERS = [
   { id: "hero", label: "Start" },
@@ -26,7 +27,7 @@ export function Landing() {
   return (
     <StoryRoot>
       <noscript>
-        <style>{`.story-scene{--p:1}.story-track{height:auto!important}.story-stage{position:relative;height:auto;min-height:100svh;padding-block:5rem}.story-hero-content{opacity:1!important;transform:none!important;filter:none!important}`}</style>
+        <style>{`.story-scene{--p:1}.story-track{height:auto!important}.story-stage{position:relative;height:auto;min-height:100svh;padding-block:5rem}.story-hero-content,.hx-window-wrap,.hx-window{opacity:1!important;transform:none!important;filter:none!important}`}</style>
       </noscript>
 
       <a

@@ -1,90 +1,231 @@
 import Link from "next/link";
-import { ArrowDown, CalendarCheck, CheckCircle2, Wallet } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowRight,
+  Bell,
+  CalendarDays,
+  CheckCircle2,
+  FileText,
+  LayoutDashboard,
+  MessageCircle,
+  Search,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { APP_NAME, ASSISTANT_NAME } from "@/config/brand";
 import { MascotSpot, Scene, vars } from "./shared";
 
-const HEADLINE = ["Fill your empty chairs.", "Run your clinic with less typing."];
+function Word({ i, children }: { i: number; children: string }) {
+  return (
+    <>
+      <span className="story-mask">
+        <span className="story-mask-in" style={vars({ "--i": i })}>
+          {children}
+        </span>
+      </span>{" "}
+    </>
+  );
+}
 
-const CAPSULES = [
-  { x: "6%", y: "18%", size: 3.2, speed: 0.9, rotate: -24 },
-  { x: "88%", y: "14%", size: 2.4, speed: 1.4, rotate: 32 },
-  { x: "46%", y: "8%", size: 1.6, speed: 0.6, rotate: 70 },
-  { x: "93%", y: "70%", size: 3.6, speed: 1.1, rotate: -50 },
-  { x: "3%", y: "74%", size: 2, speed: 1.6, rotate: 18 },
-  { x: "58%", y: "88%", size: 2.6, speed: 0.8, rotate: -80 },
+type NavItem = { icon: LucideIcon; label: string; active?: boolean };
+const NAV: { label: string; items: NavItem[] }[] = [
+  {
+    label: "Workspace",
+    items: [
+      { icon: LayoutDashboard, label: "Dashboard" },
+      { icon: CalendarDays, label: "Appointments", active: true },
+      { icon: Users, label: "Patients" },
+    ],
+  },
+  {
+    label: "Money",
+    items: [
+      { icon: Wallet, label: "Payment records" },
+      { icon: FileText, label: "Invoices" },
+    ],
+  },
+  { label: "Assistant", items: [{ icon: MessageCircle, label: ASSISTANT_NAME }] },
+];
+
+/** Sample day view (illustration). t = hours after 9:00, l = length in hours. */
+const HOURS = ["9 AM", "10 AM", "11 AM", "12 PM", "1 PM", "2 PM", "3 PM"];
+type Block = { t: number; l: number; what?: string; who?: string; tone?: "ok" | "wait"; live?: boolean };
+const COLUMNS: { doctor: string; blocks: Block[] }[] = [
+  {
+    doctor: "Dr. Cruz",
+    blocks: [
+      { t: 0, l: 0.75, what: "Cleaning", who: "AB", tone: "ok" },
+      { t: 1.5, l: 0.75, live: true },
+      { t: 3.5, l: 1, what: "Filling", who: "LT", tone: "wait" },
+      { t: 5.25, l: 0.75, what: "Cleaning", who: "DC", tone: "ok" },
+    ],
+  },
+  {
+    doctor: "Dr. Reyes",
+    blocks: [
+      { t: 0.5, l: 1, what: "Consultation", who: "RM", tone: "ok" },
+      { t: 2, l: 1, what: "Braces adjustment", who: "CV", tone: "ok" },
+      { t: 4.25, l: 1.25, what: "Root canal", who: "JP", tone: "ok" },
+    ],
+  },
+  {
+    doctor: "Dr. Lim",
+    blocks: [
+      { t: 0, l: 1.25, what: "Check-up", who: "TG", tone: "ok" },
+      { t: 2.25, l: 0.75, what: "Cleaning", who: "HS", tone: "ok" },
+      { t: 3.5, l: 0.75, what: "Check-up", who: "AM", tone: "wait" },
+      { t: 5, l: 1, what: "Filling", who: "BS", tone: "ok" },
+    ],
+  },
 ];
 
 export function HeroScene() {
-  let index = 0;
   return (
-    <Scene id="hero" label="Start" len={175} className="story-hero-scene">
-      <div className="story-hero-bg" aria-hidden="true">
-        <span className="story-glow" />
-        {CAPSULES.map((c, i) => (
-          <span
-            key={i}
-            className="story-capsule"
-            style={vars({ left: c.x, top: c.y, "--sz": `${c.size}rem`, "--sp": c.speed, "--r": c.rotate })}
-          >
-            <span className="story-capsule-body" style={vars({ "--d": `${i * 0.7}s` })} />
+    <Scene id="hero" label="Start" len={190} tone="dark" className="story-hero-scene hx">
+      <div className="hx-lines" aria-hidden="true" />
+
+      <div className="hx-copy story-hero-content">
+        <p className="hx-eyebrow">
+          <span aria-hidden="true" />
+          Made for clinics in the Philippines
+          <span aria-hidden="true" />
+        </p>
+        <h1 id="hero-title" className="hx-title">
+          <span className="block">
+            <Word i={0}>Fill</Word>
+            <Word i={1}>your</Word>
+            <Word i={2}>empty</Word>
+            <Word i={3}>chairs.</Word>
           </span>
-        ))}
+          <span className="hx-title-soft block">
+            <Word i={4}>Run</Word>
+            <Word i={5}>your</Word>
+            <Word i={6}>clinic</Word>
+            <Word i={7}>with</Word>
+            <Word i={8}>less</Word>
+            <Word i={9}>typing.</Word>
+          </span>
+        </h1>
+        <p className="hx-sub">
+          {APP_NAME} is a supervised AI front desk with appointments, patient records and a payment
+          logbook in one place. {ASSISTANT_NAME} drafts the work. Your staff approve it.
+        </p>
+        <div className="hx-cta">
+          <Button asChild variant="mint" className="hx-primary" data-magnetic="" data-cursor-label="Start">
+            <Link href="/signup">
+              Create your clinic <ArrowRight aria-hidden="true" />
+            </Link>
+          </Button>
+          <a href="#chair" className="hx-link" data-cursor-label="Watch">
+            See how it works <ArrowDown aria-hidden="true" />
+          </a>
+        </div>
+        <p className="hx-note">Free during early access.</p>
       </div>
 
-      <div className="story-hero-content mx-auto grid w-full max-w-6xl items-center gap-4 px-6 pt-20 lg:grid-cols-[1.2fr_0.8fr] lg:gap-10">
-        <div className="flex flex-col gap-5 sm:gap-7">
-          <p className="story-hero-chip bg-mint text-mint-ink w-fit rounded-full px-4 py-1.5 text-xs font-semibold sm:text-sm">
-            Made for clinics in the Philippines
-          </p>
-          <h1 id="hero-title" className="story-h1">
-            {HEADLINE.map((line) => (
-              <span key={line} className="block">
-                {line.split(" ").map((word) => (
-                  <span key={`${word}-${index}`}>
-                    <span className="story-mask">
-                      <span className="story-mask-in" style={vars({ "--i": index++ })}>
-                        {word}
-                      </span>
-                    </span>{" "}
-                  </span>
+      <div className="hx-stage">
+        <div className="hx-window-wrap">
+          <MascotSpot mood="happy" className="hx-spot" />
+          <div className="hx-window" aria-hidden="true">
+            <div className="hx-side">
+              <div className="hx-clinic">
+                <span className="hx-clinic-badge">D</span>
+                <span className="flex min-w-0 flex-col leading-tight">
+                  <small>CURRENT CLINIC</small>
+                  <b>Dental Clinic</b>
+                </span>
+              </div>
+              {NAV.map((group) => (
+                <div key={group.label} className="hx-nav-group">
+                  <small>{group.label}</small>
+                  {group.items.map((item) => (
+                    <span key={item.label} className={item.active ? "hx-nav is-active" : "hx-nav"}>
+                      <item.icon aria-hidden="true" />
+                      {item.label}
+                    </span>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            <div className="hx-main">
+              <div className="hx-top">
+                <span className="hx-search">
+                  <Search aria-hidden="true" /> Search patients or INV number
+                </span>
+                <span className="hx-bell">
+                  <Bell aria-hidden="true" />
+                  <i />
+                </span>
+                <span className="hx-avatar">QA</span>
+              </div>
+              <div className="hx-head">
+                <span className="flex flex-col leading-tight">
+                  <small>Thursday, November 26</small>
+                  <b>Appointments</b>
+                </span>
+                <span className="hx-seg">
+                  <i className="is-on">Day</i>
+                  <i>Week</i>
+                </span>
+                <span className="hx-new">New appointment</span>
+                <span className="story-sample hx-sample">Sample data</span>
+              </div>
+              <div className="hx-cal">
+                <div className="hx-gutter">
+                  {HOURS.map((h) => (
+                    <span key={h}>{h}</span>
+                  ))}
+                </div>
+                {COLUMNS.map((col) => (
+                  <div key={col.doctor} className="hx-col">
+                    <p className="hx-doc">{col.doctor}</p>
+                    <div className="hx-track">
+                      {col.blocks.map((block, i) =>
+                        block.live ? (
+                          <div key={i} className="hx-blk hx-live" style={vars({ "--t": block.t, "--l": block.l })}>
+                            <span className="hx-bg hx-bg-ok" />
+                            <span className="hx-bg hx-bg-bad" />
+                            <span className="hx-bg hx-bg-open" />
+                            <span className="hx-bg hx-bg-new" />
+                            <span className="hx-blk-text">
+                              <b className="hx-l-a">Check-up · MS</b>
+                              <b className="hx-l-b">Open slot</b>
+                              <b className="hx-l-c">Check-up · JD</b>
+                            </span>
+                            <span className="hx-tag">Cancelled</span>
+                          </div>
+                        ) : (
+                          <div
+                            key={i}
+                            className={`hx-blk hx-blk-${block.tone}`}
+                            style={vars({ "--t": block.t, "--l": block.l })}
+                          >
+                            <span className="hx-blk-text">
+                              <b>
+                                {block.what} · {block.who}
+                              </b>
+                            </span>
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  </div>
                 ))}
-              </span>
-            ))}
-          </h1>
-          <p className="story-hero-sub text-ink-2 max-w-xl text-base sm:text-lg">
-            {APP_NAME} is a supervised AI front desk with appointments, patient records and a payment
-            logbook in one place. {ASSISTANT_NAME} drafts the work. Your staff approve it.
-          </p>
-          <div className="story-hero-cta flex flex-col gap-3 sm:flex-row">
-            <Button asChild className="story-cta" data-magnetic="" data-cursor-label="Start">
-              <Link href="/signup">Create your clinic</Link>
-            </Button>
-            <Button asChild variant="ghost" data-magnetic="" data-cursor-label="Hi">
-              <Link href="/login">Sign in</Link>
-            </Button>
+              </div>
+              <div className="hx-toast">
+                <CheckCircle2 aria-hidden="true" />
+                <span className="flex flex-col leading-tight">
+                  <b>Slot refilled</b>
+                  <small>Offer accepted from the waitlist</small>
+                </span>
+              </div>
+            </div>
           </div>
         </div>
-
-        <div className="story-orbit relative mx-auto flex aspect-square w-full max-w-[22rem] items-center justify-center lg:max-w-md">
-          <span className="story-ring story-ring-a" aria-hidden="true" />
-          <span className="story-ring story-ring-b" aria-hidden="true" />
-          <MascotSpot mood="happy" className="w-24 sm:w-40 lg:w-56" />
-          <span className="story-float story-float-1 bg-surface border-line shadow-card" style={vars({ "--d": "0s" })}>
-            <CheckCircle2 aria-hidden="true" className="text-mint-ink" /> Slot refilled
-          </span>
-          <span className="story-float story-float-2 bg-surface border-line shadow-card" style={vars({ "--d": "0.9s" })}>
-            <CalendarCheck aria-hidden="true" className="text-mint-ink" /> New booking
-          </span>
-          <span className="story-float story-float-3 bg-surface border-line shadow-card" style={vars({ "--d": "1.7s" })}>
-            <Wallet aria-hidden="true" className="text-mint-ink" /> Payment recorded
-          </span>
-        </div>
       </div>
-
-      <p className="story-scroll-cue text-muted absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2 text-xs font-semibold tracking-[0.18em] uppercase">
-        <ArrowDown aria-hidden="true" className="size-4" /> Scroll
-      </p>
     </Scene>
   );
 }
