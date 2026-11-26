@@ -9,6 +9,7 @@ import { formString, type ActionState } from "@/lib/action-state";
 import { createClient } from "@/lib/supabase/server";
 import { hashToken, newToken } from "@/lib/token";
 import { MCP_SCOPES } from "./scopes";
+import { expiryFromChoice, MCP_EXPIRY_DAYS } from "./expiry";
 
 const DENIED: ActionState = { message: "Only the clinic owner can manage MCP tokens." };
 
@@ -24,7 +25,8 @@ export async function createMcpTokenAction(_prev: ActionState, formData: FormDat
   const parsed = z.object({
     name: z.string().trim().min(1).max(80),
     scopes: z.array(z.enum(MCP_SCOPES)).max(MCP_SCOPES.length),
-  }).safeParse({ name: formString(formData, "name"), scopes: formData.getAll("scopes").map(String) });
+    expiresInDays: z.coerce.number().pipe(z.union(MCP_EXPIRY_DAYS.map((d) => z.literal(d)) as [z.ZodLiteral<number>, z.ZodLiteral<number>, z.ZodLiteral<number>])),
+  }).safeParse({ name: formString(formData, "name"), scopes: formData.getAll("scopes").map(String), expiresInDays: formString(formData, "expiresInDays") || "90" });
   if (!parsed.success) return { message: "Enter a name and choose valid scopes." };
   const token = newToken();
   const supabase = await createClient();
@@ -33,10 +35,11 @@ export async function createMcpTokenAction(_prev: ActionState, formData: FormDat
     name: parsed.data.name,
     token_hash: hashToken(token),
     scopes: parsed.data.scopes,
+    expires_at: expiryFromChoice(parsed.data.expiresInDays).toISOString(),
     created_by: ctx.userId,
   }).select("id").maybeSingle();
   if (error || !data) return { message: "We could not create that token." };
-  await logAudit(supabase, ctx.clinicId, "mcp.token_created", "mcp_token", data.id, { scopes: parsed.data.scopes.join(",") });
+  await logAudit(supabase, ctx.clinicId, "mcp.token_created", "mcp_token", data.id, { scopes: parsed.data.scopes.join(","), expiresInDays: parsed.data.expiresInDays });
   revalidatePath("/integrations");
   return { ok: true, message: "Token created. Copy it now; it will not be shown again.", data: { token } };
 }

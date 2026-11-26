@@ -10,7 +10,7 @@ import {
 
 const INVOICE_COLUMNS =
   "id, invoice_number, patient_id, doctor_id, status, issued_on, due_on, note, subtotal_centavos, discount_centavos, tax_centavos, total_centavos, created_at, sent_at, paid_at, voided_at";
-export const INVOICE_PAGE_SIZE = 20;
+export const INVOICE_PAGE_SIZE = 10;
 
 function check(error: { code?: string } | null, what: string): void {
   if (error) throw new Error(`Could not load ${what} (${error.code ?? "error"})`);

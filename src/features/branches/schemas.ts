@@ -8,7 +8,34 @@ const optionalText = (max: number) =>
     .transform((v) => (v === "" ? undefined : v))
     .optional();
 
-export const branchFormSchema = z.object({
+const coordinate = (limit: number, label: string) => {
+  const message = `Enter a ${label} between ${-limit} and ${limit}.`;
+  return z
+    .string()
+    .trim()
+    .regex(/^(?:[+-]?(?:\d+(?:\.\d*)?|\.\d+))?$/, message)
+    .transform((value) => (value === "" ? null : Number(value)))
+    .pipe(z.number().min(-limit, message).max(limit, message).nullable())
+    .transform((value) => (value === null ? null : Number(value.toFixed(6))))
+    .optional();
+};
+
+const coordinateFields = {
+  latitude: coordinate(90, "latitude"),
+  longitude: coordinate(180, "longitude"),
+};
+
+export const branchCoordinatesSchema = z.object(coordinateFields).superRefine((point, ctx) => {
+  if ((point.latitude == null) !== (point.longitude == null)) {
+    ctx.addIssue({
+      code: "custom",
+      path: [point.latitude == null ? "latitude" : "longitude"],
+      message: "Enter both coordinates or clear the pin.",
+    });
+  }
+});
+
+export const branchFormSchema = branchCoordinatesSchema.safeExtend({
   name: z.string().trim().min(1, "Enter the branch name.").max(120),
   address: optionalText(300),
   phone: optionalText(40),
@@ -51,7 +78,10 @@ export const doctorHoursFormSchema = z
     weekday: z.coerce.number().int().min(0).max(6),
     startsAt: time,
     endsAt: time,
-    windowId: z.string().optional().transform((value) => value || undefined),
+    windowId: z
+      .string()
+      .optional()
+      .transform((value) => value || undefined),
   })
   .refine((window) => window.endsAt > window.startsAt, {
     path: ["endsAt"],

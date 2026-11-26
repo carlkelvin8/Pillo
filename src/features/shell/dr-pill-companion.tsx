@@ -188,7 +188,7 @@ export function DrPillCompanion({ role }: { role: Role }) {
             <p
               role="status"
               aria-live="polite"
-              className="bg-mint text-mint-ink rounded-control flex min-h-10 items-center gap-2 px-3 text-xs font-semibold"
+              className="bg-mint text-mint-ink rounded-control flex min-h-11 items-center gap-2 px-3 text-xs font-semibold"
             >
               <span className="companion-status-pulse bg-mint-ink size-2 rounded-full" />
               Ready to help

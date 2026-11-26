@@ -53,20 +53,48 @@ describe("cleanMessage", () => {
 });
 
 describe("live AI configuration", () => {
-  it("keeps clinic chat disabled even when Gemini credentials are present", () => {
-    const previousGemini = process.env.GEMINI_API_KEY;
-    const previousSupabase = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    process.env.GEMINI_API_KEY = "test-gemini-key";
-    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
-    try {
-      expect(chatConfigured()).toEqual({ ok: false, missing: "AI_PROVIDER_NOT_CONFIGURED" });
-      expect(createModelCall()).toBeNull();
-    } finally {
-      if (previousGemini === undefined) delete process.env.GEMINI_API_KEY;
-      else process.env.GEMINI_API_KEY = previousGemini;
-      if (previousSupabase === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-      else process.env.SUPABASE_SERVICE_ROLE_KEY = previousSupabase;
+  function withEnv(vars: Record<string, string | undefined>, run: () => void) {
+    const previous = Object.fromEntries(Object.keys(vars).map((k) => [k, process.env[k]]));
+    for (const [k, v] of Object.entries(vars)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
     }
+    try {
+      run();
+    } finally {
+      for (const [k, v] of Object.entries(previous)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    }
+  }
+
+  it("stays off by default, even with a Gemini key present", () => {
+    withEnv({ GEMINI_API_KEY: "test-gemini-key", LIVE_AI_ENABLED: undefined }, () => {
+      expect(chatConfigured()).toEqual({ ok: false, missing: "LIVE_AI_ENABLED" });
+      expect(createModelCall()).toBeNull();
+    });
+  });
+
+  it("stays off when the flag is anything other than the exact string true", () => {
+    withEnv({ GEMINI_API_KEY: "test-gemini-key", LIVE_AI_ENABLED: "1" }, () => {
+      expect(chatConfigured().ok).toBe(false);
+      expect(createModelCall()).toBeNull();
+    });
+  });
+
+  it("enables clinic chat only when the flag and Gemini credentials are both present", () => {
+    withEnv({ GEMINI_API_KEY: "test-gemini-key", LIVE_AI_ENABLED: "true" }, () => {
+      expect(chatConfigured()).toEqual({ ok: true, model: "gemini-3.8-flash" });
+      expect(createModelCall()).not.toBeNull();
+    });
+  });
+
+  it("reports the missing key when enabled without a Gemini key", () => {
+    withEnv({ GEMINI_API_KEY: undefined, LIVE_AI_ENABLED: "true" }, () => {
+      expect(chatConfigured()).toEqual({ ok: false, missing: "GEMINI_API_KEY" });
+      expect(createModelCall()).toBeNull();
+    });
   });
 });
 

@@ -13,8 +13,9 @@ describe("findLocalSpeechVoice", () => {
     expect(findLocalSpeechVoice([english, filipino])).toBe(filipino);
   });
 
-  it("never selects a remote voice", () => {
-    expect(findLocalSpeechVoice([voice("en-US", false)])).toBeNull();
+  it("falls back to an available remote Filipino voice when no local voice exists", () => {
+    const remoteFilipino = voice("fil-PH", false);
+    expect(findLocalSpeechVoice([remoteFilipino])).toBe(remoteFilipino);
   });
 
   it("uses the first local voice when preferred languages are unavailable", () => {

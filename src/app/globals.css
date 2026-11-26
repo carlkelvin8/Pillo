@@ -48,13 +48,84 @@
   --text-card-title--font-weight: 600;
 
   /* Layout */
-  --spacing-sidebar: 16rem;
+  /* 240px on small laptops, up to 272px on wide screens. */
+  --spacing-sidebar: clamp(15rem, 15vw, 17rem);
   --spacing-page: clamp(1.5rem, 3vw, 3rem);
 }
 
 /* Numbers and money */
 @utility tabular {
   font-variant-numeric: tabular-nums;
+}
+
+.app-shell[data-sidebar-collapsed="true"] .app-sidebar {
+  padding: 1rem 0.375rem;
+}
+
+.app-shell[data-sidebar-collapsed="true"] .sidebar-brand-link > span > span:last-child,
+.app-shell[data-sidebar-collapsed="true"] .sidebar-clinic-copy,
+.app-shell[data-sidebar-collapsed="true"] .sidebar-group-label,
+.app-shell[data-sidebar-collapsed="true"] .sidebar-nav-label,
+.app-shell[data-sidebar-collapsed="true"] .sidebar-user-copy {
+  display: none;
+}
+
+.app-shell[data-sidebar-collapsed="true"] .sidebar-clinic-context {
+  justify-content: center;
+  padding: 0.25rem;
+  border-color: transparent;
+  background: transparent;
+}
+
+.app-shell[data-sidebar-collapsed="true"] .sidebar-nav {
+  gap: 0.875rem;
+}
+
+.app-shell[data-sidebar-collapsed="true"] .sidebar-nav-group {
+  align-items: center;
+}
+
+.app-shell[data-sidebar-collapsed="true"] .sidebar-nav-group ul {
+  width: 100%;
+  align-items: center;
+}
+
+.app-shell[data-sidebar-collapsed="true"] .sidebar-nav-link {
+  width: 2.5rem;
+  height: 2.5rem;
+  min-height: 2.5rem;
+  margin-inline: auto;
+  justify-content: center;
+  gap: 0;
+  padding-inline: 0;
+}
+
+.app-shell[data-sidebar-collapsed="true"] .sidebar-nav-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.app-shell[data-sidebar-collapsed="true"] .sidebar-user-card {
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+}
+
+.app-shell[data-sidebar-collapsed="true"] .sidebar-user-avatar,
+.app-shell[data-sidebar-collapsed="true"] .sidebar-sign-out {
+  width: 2rem;
+  height: 2rem;
+}
+
+.app-shell[data-sidebar-collapsed="true"] .sidebar-user-card form {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+}
+
+.sidebar-nav-link[aria-current="page"] .sidebar-nav-icon {
+  color: var(--color-mint-strong);
 }
 
 .pill-avatar-eyes {

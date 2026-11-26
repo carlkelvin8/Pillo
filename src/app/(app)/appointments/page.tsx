@@ -23,9 +23,8 @@ import {
 import {
   assignLanes,
   blockPosition,
-  gridRange,
+  calendarGrid,
   HEADER_PX,
-  HOUR_PX,
 } from "@/features/scheduling/calendar-layout";
 import {
   listAppointments,
@@ -143,12 +142,12 @@ export default async function AppointmentsPage({ searchParams }: Props) {
           );
         });
 
-  const { startHour, endHour } = gridRange(
-    branchWindows.map((w) => ({ start: w.start, end: w.end })),
+  const visibleWeekdays = new Set(days.map(weekdayOf));
+  const grid = calendarGrid(
+    branchWindows.filter((w) => visibleWeekdays.has(w.weekday)),
     appointments.map((a) => ({ startsAt: a.starts_at, endsAt: a.ends_at })),
     tz,
   );
-  const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
 
   const doctorName = new Map(doctors.map((d) => [d.id, d.display_name]));
   const nowMs = Date.now();
@@ -175,7 +174,7 @@ export default async function AppointmentsPage({ searchParams }: Props) {
     blocksByDay.set(
       d,
       laned.map((a) => {
-        const { top, height } = blockPosition(a.starts_at, a.ends_at, tz, startHour);
+        const { top, height } = blockPosition(a, tz, grid);
         return {
           id: a.id,
           patientId: a.patient_id,
@@ -272,10 +271,161 @@ export default async function AppointmentsPage({ searchParams }: Props) {
         </p>
       ) : null}
 
-      <div className="grid items-stretch gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <Card className="flex flex-col gap-4 p-4 sm:p-7">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-stretch gap-6 xl:grid-cols-3">
+        <Card className="flex h-full flex-col gap-4 p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>Doctors</CardTitle>
+              <p className="text-muted mt-1 text-xs">Availability for this branch today</p>
+            </div>
+            <Chip tone="neutral">{doctors.length} active</Chip>
+          </div>
+          {doctors.length === 0 ? (
+            <p className="text-muted text-sm">
+              No doctors yet.{" "}
+              {canSetup ? (
+                <Link href="/settings/doctors" className="text-ink font-medium underline">
+                  Add a doctor
+                </Link>
+              ) : null}
+            </p>
+          ) : (
+            <ul className="max-h-72 space-y-2 overflow-y-auto overscroll-contain pr-1">
+              {doctors.map((d) => {
+                const works = branch
+                  ? doctorWorksOn(
+                      today,
+                      branchWindows,
+                      doctorHours
+                        .filter((h) => h.doctor_id === d.id && h.branch_id === branch.id)
+                        .map((h) => ({ weekday: h.weekday, start: h.starts_at, end: h.ends_at })),
+                    )
+                  : false;
+                return (
+                  <li
+                    key={d.id}
+                    className="bg-canvas rounded-control flex min-w-0 flex-col gap-2 p-3"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span
+                        aria-hidden="true"
+                        className="bg-mint text-mint-ink flex size-11 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                      >
+                        {initials(d.display_name)}
+                      </span>
+                      <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                        <span className="truncate font-medium">{d.display_name}</span>
+                        {d.specialty ? (
+                          <span className="text-muted truncate text-xs">{d.specialty}</span>
+                        ) : null}
+                      </span>
+                    </div>
+                    <Chip tone={works ? "success" : "neutral"} className="ml-14 w-fit px-2.5">
+                      <span
+                        aria-hidden="true"
+                        className={cn("size-1.5 rounded-full", works ? "bg-mint-ink" : "bg-muted")}
+                      />
+                      {works ? "Available today" : "Off today"}
+                    </Chip>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+
+        {canBook ? (
+          <Card className="flex h-full flex-col gap-4 p-5 sm:p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Waitlist</CardTitle>
+                <p className="text-muted mt-1 text-xs">Patients looking for an earlier slot</p>
+              </div>
+              {waitlist.length > 0 ? <Chip tone="neutral">{waitlist.length}</Chip> : null}
+              <AddToWaitlistDialog doctors={doctorOptions} />
+            </div>
+            {waitlist.length === 0 ? (
+              <p className="text-muted text-sm">Nobody is waiting for an earlier slot.</p>
+            ) : (
+              <ul className="max-h-72 space-y-2 overflow-y-auto overscroll-contain pr-1">
+                {waitlist.map((w) => {
+                  const name = waitNames.get(w.patient_id)?.name ?? "Patient";
+                  const preferredDays = w.preferred_weekdays
+                    .map((x) => WEEKDAY_NAMES[x]?.slice(0, 3))
+                    .filter(Boolean);
+                  return (
+                    <li
+                      key={w.id}
+                      className="bg-canvas rounded-control flex min-w-0 flex-col gap-3 p-3"
+                    >
+                      <div className="flex min-w-0 items-start gap-3">
+                        <span
+                          aria-hidden="true"
+                          className="bg-surface text-ink-2 flex size-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                        >
+                          {initials(name)}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold">{name}</p>
+                          <p className="text-muted mt-0.5 truncate text-xs">
+                            {[w.reason, w.doctor_id ? doctorName.get(w.doctor_id) : null]
+                              .filter(Boolean)
+                              .join(" · ") || "Any appointment"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {preferredDays.length > 0 ? (
+                          preferredDays.map((day) => (
+                            <Chip key={day} tone="neutral" className="bg-surface">
+                              {day}
+                            </Chip>
+                          ))
+                        ) : (
+                          <span className="text-muted text-xs">Any day</span>
+                        )}
+                      </div>
+                      <div className="border-line flex items-center justify-between gap-2 border-t pt-2">
+                        <OutreachChip ok={w.outreach_ok} />
+                        <WaitlistRemoveButton entryId={w.id} name={name} />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
+        ) : null}
+
+        <Card className="flex flex-col gap-4 p-5 sm:p-6">
+          <div>
+            <CardTitle>Appointment status</CardTitle>
+            <p className="text-muted mt-1 text-xs">Status key</p>
+          </div>
+          <ul className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+            {LEGEND.map((l) => (
+              <li key={l.label} className="flex min-w-0 items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className={cn("size-3.5 shrink-0 rounded-[4px] border", l.className)}
+                />
+                <span className="text-ink-2 leading-snug">
+                  {l.label === "Scheduled or confirmed"
+                    ? "Scheduled"
+                    : l.label === "Booked by Dr. Pill"
+                      ? "Dr. Pill booking"
+                      : l.label}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </div>
+
+      <div className="w-full">
+        <Card className="flex min-w-0 flex-col gap-4 p-4 sm:p-7">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               <Button asChild variant="ghost" size="icon" aria-label="Previous">
                 <Link
                   href={href({
@@ -285,7 +435,7 @@ export default async function AppointmentsPage({ searchParams }: Props) {
                   <ChevronLeft aria-hidden="true" />
                 </Link>
               </Button>
-              <h2 className="text-card-title min-w-44 text-center">{title}</h2>
+              <h2 className="text-card-title text-center sm:min-w-44">{title}</h2>
               <Button asChild variant="ghost" size="icon" aria-label="Next">
                 <Link
                   href={href({
@@ -395,13 +545,13 @@ export default async function AppointmentsPage({ searchParams }: Props) {
             <div className="overflow-x-auto">
               <div className="flex" style={{ minWidth: days.length * 120 + 64 }}>
                 <div className="w-16 shrink-0" style={{ paddingTop: HEADER_PX }} aria-hidden="true">
-                  {hours.map((h) => (
+                  {grid.rows.map(({ hour, height }) => (
                     <div
-                      key={h}
+                      key={hour}
                       className="text-muted pt-1 pr-3 text-right text-xs"
-                      style={{ height: HOUR_PX }}
+                      style={{ height }}
                     >
-                      {hourLabel(h)}
+                      {hourLabel(hour)}
                     </div>
                   ))}
                 </div>
@@ -432,14 +582,10 @@ export default async function AppointmentsPage({ searchParams }: Props) {
                         </div>
                         <div
                           className={cn("relative", closed && "bg-canvas")}
-                          style={{ height: hours.length * HOUR_PX }}
+                          style={{ height: grid.height }}
                         >
-                          {hours.map((h) => (
-                            <div
-                              key={h}
-                              className="border-subtle border-t"
-                              style={{ height: HOUR_PX }}
-                            />
+                          {grid.rows.map(({ hour, height }) => (
+                            <div key={hour} className="border-subtle border-t" style={{ height }} />
                           ))}
                           {closed ? (
                             <span className="text-muted absolute inset-x-0 top-3 text-center text-xs">
@@ -458,154 +604,6 @@ export default async function AppointmentsPage({ searchParams }: Props) {
             </div>
           )}
         </Card>
-
-        <div className="flex min-h-0 flex-col gap-6">
-          <Card className="flex flex-col gap-4 p-5 sm:p-6">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <CardTitle>Doctors</CardTitle>
-                <p className="text-muted mt-1 text-xs">Availability for this branch today</p>
-              </div>
-              <Chip tone="neutral">{doctors.length} active</Chip>
-            </div>
-            {doctors.length === 0 ? (
-              <p className="text-muted text-sm">
-                No doctors yet.{" "}
-                {canSetup ? (
-                  <Link href="/settings/doctors" className="text-ink font-medium underline">
-                    Add a doctor
-                  </Link>
-                ) : null}
-              </p>
-            ) : (
-              <ul className="max-h-72 space-y-2 overflow-y-auto overscroll-contain pr-1">
-                {doctors.map((d) => {
-                  const works = branch
-                    ? doctorWorksOn(
-                        today,
-                        branchWindows,
-                        doctorHours
-                          .filter((h) => h.doctor_id === d.id && h.branch_id === branch.id)
-                          .map((h) => ({ weekday: h.weekday, start: h.starts_at, end: h.ends_at })),
-                      )
-                    : false;
-                  return (
-                    <li
-                      key={d.id}
-                      className="bg-canvas rounded-control flex min-w-0 flex-col gap-2 p-3"
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <span
-                          aria-hidden="true"
-                          className="bg-mint text-mint-ink flex size-11 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-                        >
-                          {initials(d.display_name)}
-                        </span>
-                        <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                          <span className="truncate font-medium">{d.display_name}</span>
-                          {d.specialty ? (
-                            <span className="text-muted truncate text-xs">{d.specialty}</span>
-                          ) : null}
-                        </span>
-                      </div>
-                      <Chip tone={works ? "success" : "neutral"} className="ml-14 w-fit px-2.5">
-                        <span
-                          aria-hidden="true"
-                          className={cn(
-                            "size-1.5 rounded-full",
-                            works ? "bg-mint-ink" : "bg-muted",
-                          )}
-                        />
-                        {works ? "Available today" : "Off today"}
-                      </Chip>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Card>
-
-          {canBook ? (
-            <Card className="flex flex-col gap-4 p-5 sm:p-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <CardTitle>Waitlist</CardTitle>
-                  <p className="text-muted mt-1 text-xs">Patients looking for an earlier slot</p>
-                </div>
-                {waitlist.length > 0 ? <Chip tone="neutral">{waitlist.length}</Chip> : null}
-                <AddToWaitlistDialog doctors={doctorOptions} />
-              </div>
-              {waitlist.length === 0 ? (
-                <p className="text-muted text-sm">Nobody is waiting for an earlier slot.</p>
-              ) : (
-                <ul className="max-h-72 space-y-2 overflow-y-auto overscroll-contain pr-1">
-                  {waitlist.map((w) => {
-                    const name = waitNames.get(w.patient_id)?.name ?? "Patient";
-                    const preferredDays = w.preferred_weekdays
-                      .map((x) => WEEKDAY_NAMES[x]?.slice(0, 3))
-                      .filter(Boolean);
-                    return (
-                      <li
-                        key={w.id}
-                        className="bg-canvas rounded-control flex min-w-0 flex-col gap-3 p-3"
-                      >
-                        <div className="flex min-w-0 items-start gap-3">
-                          <span
-                            aria-hidden="true"
-                            className="bg-surface text-ink-2 flex size-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-                          >
-                            {initials(name)}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate font-semibold">{name}</p>
-                            <p className="text-muted mt-0.5 truncate text-xs">
-                              {[w.reason, w.doctor_id ? doctorName.get(w.doctor_id) : null]
-                                .filter(Boolean)
-                                .join(" · ") || "Any appointment"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {preferredDays.length > 0 ? (
-                            preferredDays.map((day) => (
-                              <Chip key={day} tone="neutral" className="bg-surface">
-                                {day}
-                              </Chip>
-                            ))
-                          ) : (
-                            <span className="text-muted text-xs">Any day</span>
-                          )}
-                        </div>
-                        <div className="border-line flex items-center justify-between gap-2 border-t pt-2">
-                          <OutreachChip ok={w.outreach_ok} />
-                          <WaitlistRemoveButton entryId={w.id} name={name} />
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </Card>
-          ) : null}
-
-          <Card className="flex flex-col gap-4 p-5 sm:p-6">
-            <div>
-              <CardTitle>Appointment status</CardTitle>
-              <p className="text-muted mt-1 text-xs">Color key for the calendar</p>
-            </div>
-            <ul className="flex flex-col gap-2 text-sm">
-              {LEGEND.map((l) => (
-                <li key={l.label} className="flex min-h-9 items-center gap-3">
-                  <span
-                    aria-hidden="true"
-                    className={cn("size-4 shrink-0 rounded-[5px] border", l.className)}
-                  />
-                  <span className="text-ink-2">{l.label}</span>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </div>
       </div>
     </>
   );

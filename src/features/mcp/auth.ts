@@ -17,7 +17,7 @@ export async function authenticateMcp(header: string | null): Promise<McpAuth | 
   const rows = await db.execute(sql`
     select id, clinic_id, scopes
     from public.mcp_tokens
-    where token_hash = ${hashToken(token)} and revoked_at is null
+    where token_hash = ${hashToken(token)} and revoked_at is null and expires_at > now()
     limit 1
   `);
   const row = rows[0] as { id: string; clinic_id: string; scopes: string[] } | undefined;

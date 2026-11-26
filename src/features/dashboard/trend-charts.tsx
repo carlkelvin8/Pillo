@@ -1,201 +1,216 @@
 import { Card, CardTitle } from "@/components/ui/card";
 import { formatPHP } from "@/lib/money";
+import { cn } from "@/lib/utils";
 
 const MONTH = new Intl.DateTimeFormat("en-PH", { month: "short", timeZone: "UTC" });
+const COUNT = new Intl.NumberFormat("en-PH");
+const PHP_AXIS = new Intl.NumberFormat("en-PH", {
+  style: "currency",
+  currency: "PHP",
+  notation: "compact",
+  maximumFractionDigits: 2,
+});
+const AXIS_INTERVALS = 4;
 
 function monthLabel(month: string) {
   return MONTH.format(new Date(`${month}-01T00:00:00Z`));
 }
 
-function priorMonthLabel(months: string[]) {
-  const month = months.at(-2);
-  return month ? monthLabel(month) : "prior month";
+function signedChange(value: number, format: (value: number) => string) {
+  return `${value > 0 ? "+" : value < 0 ? "−" : ""}${format(Math.abs(value))}`;
 }
 
-export function CollectionsBarChart({
+function MonthlyTrend({
   months,
   values,
-  total,
+  title,
 }: {
   months: string[];
   values: number[];
-  total: number;
+  title: "Appointments" | "Collections";
 }) {
-  const maxValue = Math.max(1, ...values);
-  const current = values.at(-1) ?? 0;
-  const previous = values.at(-2) ?? 0;
-  const difference = current - previous;
-  const change =
-    difference === 0
-      ? "No change vs prior month"
-      : `${difference > 0 ? "+" : "−"}${formatPHP(Math.abs(difference))} vs ${priorMonthLabel(months)}`;
+  const isCollections = title === "Collections";
+  const format = isCollections ? formatPHP : COUNT.format;
+  const data = months.map((month, index) => ({ month, value: values[index] ?? 0 }));
+  const total = data.reduce((sum, month) => sum + month.value, 0);
+  const end = data.length - 1;
+
+  // The current calendar month is in progress. Compare the two most recent completed months.
+  const latestComplete = data.at(-2);
+  const previousComplete = data.at(-3);
+  const difference = (latestComplete?.value ?? 0) - (previousComplete?.value ?? 0);
+
+  const max = Math.max(1, ...data.map(({ value }) => value));
+  const magnitude = 10 ** Math.max(0, Math.floor(Math.log10(max / AXIS_INTERVALS)));
+  const step = Math.ceil(max / AXIS_INTERVALS / magnitude) * magnitude;
+  const ceiling = step * AXIS_INTERVALS;
+  const ticks = Array.from({ length: AXIS_INTERVALS + 1 }, (_, i) => ceiling - i * step);
+  const gridTemplateColumns = `repeat(${months.length}, minmax(0, 1fr))`;
+  const points = data.map(({ value }, index) => {
+    const x = (((index + 0.5) / months.length) * 1000).toFixed(2);
+    const y = (100 - (value / ceiling) * 100).toFixed(2);
+    return { x: Number(x), y: Number(y) };
+  });
+  const linePath = points
+    .map(({ x, y }, index) => `${index === 0 ? "M" : "L"} ${x} ${y}`)
+    .join(" ");
 
   return (
-    <Card className="flex min-w-0 flex-col gap-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <CardTitle>Collections</CardTitle>
-        <span className="tabular text-muted text-sm">Last 12 months</span>
+    <Card className="@container flex min-w-0 flex-col gap-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <CardTitle>{title}</CardTitle>
+        <span className="text-muted text-xs">Last {months.length} months</span>
       </div>
-      <p className="tabular text-3xl font-semibold tracking-tight">{formatPHP(total)}</p>
-      <p className={difference > 0 ? "text-mint-ink text-sm font-medium" : "text-muted text-sm"}>
-        {change}
-      </p>
-      <div
-        className="flex h-36 items-end gap-2"
-        role="img"
-        aria-label={`Collections by month, total ${formatPHP(total)}`}
-      >
-        {months.map((month, index) => {
-          const value = values[index] ?? 0;
-          return (
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <p className="tabular text-3xl font-semibold tracking-tight">{format(total)}</p>
+        {total > 0 && latestComplete && previousComplete ? (
+          <p className="text-muted flex flex-wrap gap-x-1.5 text-sm">
+            <span className={cn("tabular font-semibold", difference > 0 && "text-mint-ink")}>
+              {signedChange(difference, format)}
+            </span>
+            <span>
+              {monthLabel(latestComplete.month)} vs {monthLabel(previousComplete.month)}
+            </span>
+          </p>
+        ) : null}
+      </div>
+
+      {total > 0 ? (
+        <>
+          <div
+            className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2"
+            role="img"
+            aria-label={`${title} by month, ${format(total)} total`}
+          >
             <div
-              key={month}
-              className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"
+              className="tabular text-muted flex flex-col justify-between text-right text-xs"
               aria-hidden="true"
-              title={`${month}: ${formatPHP(value)}`}
             >
-              <div
-                className={`w-full rounded-t-[4px] ${value > 0 ? "bg-mint-ink" : "bg-subtle"}`}
-                style={{ height: `${Math.max(4, (value / maxValue) * 100)}%` }}
-              />
+              {ticks.map((tick) => (
+                <div key={tick} className="h-0">
+                  <span className="block -translate-y-1/2">
+                    {isCollections ? PHP_AXIS.format(tick / 100) : format(tick)}
+                  </span>
+                </div>
+              ))}
             </div>
-          );
-        })}
-      </div>
-      <div className="text-muted flex justify-between text-xs" aria-hidden="true">
-        <span>{months[0] ? monthLabel(months[0]) : ""}</span>
-        <span>{months.at(-1) ? monthLabel(months.at(-1)!) : ""}</span>
-      </div>
-      <table className="sr-only">
-        <caption>Collections by month</caption>
-        <thead>
-          <tr>
-            <th scope="col">Month</th>
-            <th scope="col">Collections</th>
-          </tr>
-        </thead>
-        <tbody>
-          {months.map((month, index) => (
-            <tr key={month}>
-              <th scope="row">{month}</th>
-              <td>{formatPHP(values[index] ?? 0)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            <div className={cn("relative", isCollections ? "h-40" : "h-56")} aria-hidden="true">
+              <div className="absolute inset-0 flex flex-col justify-between">
+                {ticks.map((tick) => (
+                  <div key={tick} className="bg-line h-px" />
+                ))}
+              </div>
+              {isCollections ? null : (
+                <svg
+                  viewBox="0 0 1000 100"
+                  className="absolute inset-0 h-full w-full overflow-visible"
+                  preserveAspectRatio="none"
+                >
+                  <path
+                    d={linePath}
+                    fill="none"
+                    stroke="var(--color-mint-ink)"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </svg>
+              )}
+              <div className="absolute inset-0 grid" style={{ gridTemplateColumns }}>
+                {data.map(({ month, value }, index) => {
+                  const previous = data[index - 1];
+                  const comparison =
+                    previous && index < end
+                      ? ` · ${signedChange(value - previous.value, format)} vs ${monthLabel(previous.month)}`
+                      : "";
+                  const height = (value / ceiling) * 100;
+                  return (
+                    <div
+                      key={month}
+                      className="relative flex min-w-0 items-end justify-center"
+                      title={`${month}: ${format(value)}${index === end ? " (current month)" : comparison}`}
+                    >
+                      {isCollections ? (
+                        <div
+                          className={cn(
+                            "w-3/5 rounded-t-sm",
+                            index === end ? "bg-mint-ink" : "bg-mint-ink/80",
+                          )}
+                          style={{ height: `${height}%` }}
+                        />
+                      ) : (
+                        <div
+                          className={cn(
+                            "absolute size-2 translate-y-1/2 rounded-full",
+                            index === end ? "bg-mint-ink" : "bg-surface",
+                          )}
+                          style={{ bottom: `${height}%` }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div
+              aria-hidden="true"
+              className="text-muted col-start-2 grid text-center text-xs"
+              style={{ gridTemplateColumns }}
+            >
+              {months.map((month, index) => {
+                const isCurrent = index === end;
+                const isSpacedTick = index % 2 === 0 && index < end - 1;
+                const label = monthLabel(month);
+                return (
+                  <span
+                    key={month}
+                    title={isCurrent ? `${label} (current month)` : undefined}
+                    className={cn(
+                      isCurrent && "text-mint-ink font-semibold",
+                      !isCurrent && !isSpacedTick && "invisible @sm:visible",
+                    )}
+                  >
+                    {label}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+          <p className="text-muted text-xs">Current month in progress</p>
+          <table className="sr-only">
+            <caption>{title} by month</caption>
+            <thead>
+              <tr>
+                <th scope="col">Month</th>
+                <th scope="col">{title}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map(({ month, value }) => (
+                <tr key={month}>
+                  <th scope="row">{month}</th>
+                  <td>{format(value)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      ) : (
+        <p className="border-line bg-canvas text-muted rounded-control flex h-36 items-center justify-center border px-4 text-center text-sm">
+          {isCollections
+            ? "No successful payments in this period."
+            : "No appointments in this period."}
+        </p>
+      )}
     </Card>
   );
 }
 
-export function AppointmentsLineChart({ months, values }: { months: string[]; values: number[] }) {
-  const maxValue = Math.max(1, ...values);
-  const current = values.at(-1) ?? 0;
-  const previous = values.at(-2) ?? 0;
-  const difference = current - previous;
-  const change =
-    difference === 0
-      ? "No change vs prior month"
-      : `${difference > 0 ? "+" : "−"}${Math.abs(difference)} vs ${priorMonthLabel(months)}`;
-  const width = 600;
-  const height = 144;
-  const xPadding = 16;
-  const yPadding = 14;
-  const points = values.map((value, index) => {
-    const x =
-      months.length < 2
-        ? width / 2
-        : xPadding + (index / (months.length - 1)) * (width - xPadding * 2);
-    const y = height - yPadding - (value / maxValue) * (height - yPadding * 2);
-    return { x, y, value, month: months[index] ?? "" };
-  });
-  const linePoints = points.map((point) => `${point.x},${point.y}`).join(" ");
+export function CollectionsBarChart({ months, values }: { months: string[]; values: number[] }) {
+  return <MonthlyTrend months={months} values={values} title="Collections" />;
+}
 
-  return (
-    <Card className="flex min-w-0 flex-col gap-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <CardTitle>Appointments</CardTitle>
-        <span className="text-muted text-sm">Last 12 months</span>
-      </div>
-      <p className="tabular text-3xl font-semibold tracking-tight">
-        {values.reduce((sum, value) => sum + value, 0)}
-      </p>
-      <p className={difference > 0 ? "text-mint-ink text-sm font-medium" : "text-muted text-sm"}>
-        {change}
-      </p>
-      <div
-        className="min-w-0"
-        role="img"
-        aria-label={`Appointments by month, ${values.reduce((sum, value) => sum + value, 0)} total`}
-      >
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          className="h-36 w-full overflow-visible"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          {[0, 0.5, 1].map((fraction) => {
-            const y = yPadding + fraction * (height - yPadding * 2);
-            return (
-              <line
-                key={fraction}
-                x1={0}
-                x2={width}
-                y1={y}
-                y2={y}
-                stroke="var(--color-line)"
-                strokeDasharray={fraction === 1 ? undefined : "3 6"}
-                vectorEffect="non-scaling-stroke"
-              />
-            );
-          })}
-          {points.length > 0 ? (
-            <>
-              <polyline
-                points={linePoints}
-                fill="none"
-                stroke="var(--color-mint-ink)"
-                strokeWidth={3}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                vectorEffect="non-scaling-stroke"
-              />
-              {points.map((point) => (
-                <circle
-                  key={point.month}
-                  cx={point.x}
-                  cy={point.y}
-                  r={4}
-                  fill="var(--color-surface)"
-                  stroke="var(--color-mint-ink)"
-                  strokeWidth={2}
-                  vectorEffect="non-scaling-stroke"
-                />
-              ))}
-            </>
-          ) : null}
-        </svg>
-      </div>
-      <div className="text-muted flex justify-between text-xs" aria-hidden="true">
-        <span>{months[0] ? monthLabel(months[0]) : ""}</span>
-        <span>{months.at(-1) ? monthLabel(months.at(-1)!) : ""}</span>
-      </div>
-      <table className="sr-only">
-        <caption>Appointments by month</caption>
-        <thead>
-          <tr>
-            <th scope="col">Month</th>
-            <th scope="col">Appointments</th>
-          </tr>
-        </thead>
-        <tbody>
-          {months.map((month, index) => (
-            <tr key={month}>
-              <th scope="row">{month}</th>
-              <td>{values[index] ?? 0}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </Card>
-  );
+export function AppointmentsLineChart({ months, values }: { months: string[]; values: number[] }) {
+  return <MonthlyTrend months={months} values={values} title="Appointments" />;
 }

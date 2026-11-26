@@ -6,20 +6,22 @@ import { assistantSettingsSchema } from "@/features/assistant/settings";
 import { logAudit } from "@/features/audit/log";
 import { can } from "@/features/auth/permissions";
 import { getWorkspace } from "@/features/auth/workspace";
-import { clinicDetailsSchema } from "@/features/clinic/schemas";
+import { clinicDetailsSchema, clinicProfileSchema } from "@/features/clinic/schemas";
 import { echo, formString, validationFailed, type ActionState } from "@/lib/action-state";
+import { LOGO_BUCKET, LOGO_MAX_BYTES, LOGO_TYPES, sniffImageType } from "@/features/clinic/logo";
 import { createClient } from "@/lib/supabase/server";
 
 const DETAIL_KEYS = ["name", "address", "phone", "email"] as const;
+const PROFILE_KEYS = [...DETAIL_KEYS, "websiteUrl"] as const;
 const DENIED: ActionState = { message: "You do not have permission to do that." };
 
 function detailsFromForm(formData: FormData) {
-  return clinicDetailsSchema.safeParse({
+  return {
     name: formString(formData, "name"),
     address: formString(formData, "address"),
     phone: formString(formData, "phone"),
     email: formString(formData, "email"),
-  });
+  };
 }
 
 /** Onboarding step 1. Idempotent: a user who already has a clinic just moves on. */
@@ -31,7 +33,7 @@ export async function createClinicAction(
   if (!ws) redirect("/login");
   if (ws.membership) redirect("/onboarding?step=2");
 
-  const parsed = detailsFromForm(formData);
+  const parsed = clinicDetailsSchema.safeParse(detailsFromForm(formData));
   if (!parsed.success) return validationFailed(parsed.error, formData, DETAIL_KEYS);
 
   const supabase = await createClient();
@@ -57,8 +59,11 @@ export async function updateClinicAction(
   const ws = await getWorkspace();
   if (!ws?.membership || !can(ws.membership.role, "staff.manage")) return DENIED;
 
-  const parsed = detailsFromForm(formData);
-  if (!parsed.success) return validationFailed(parsed.error, formData, DETAIL_KEYS);
+  const parsed = clinicProfileSchema.safeParse({
+    ...detailsFromForm(formData),
+    websiteUrl: formData.has("websiteUrl") ? formString(formData, "websiteUrl") : undefined,
+  });
+  if (!parsed.success) return validationFailed(parsed.error, formData, PROFILE_KEYS);
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -68,10 +73,13 @@ export async function updateClinicAction(
       address: parsed.data.address ?? null,
       phone: parsed.data.phone ?? null,
       email: parsed.data.email ?? null,
+      ...(parsed.data.websiteUrl !== undefined ? { website_url: parsed.data.websiteUrl } : {}),
     })
     .eq("id", ws.membership.clinic.id)
     .select("id");
-  if (error || !data?.length) return { message: "We could not save your changes." };
+  if (error || !data?.length) {
+    return { message: "We could not save your changes.", values: echo(formData, PROFILE_KEYS) };
+  }
 
   await logAudit(
     supabase,
@@ -138,4 +146,56 @@ export async function completeOnboardingAction(): Promise<void> {
   );
   revalidatePath("/", "layout");
   redirect("/dashboard");
+}
+
+/** Settings > Clinic profile: upload the clinic logo (owners only; png, jpeg or webp up to 1 MB). */
+export async function uploadClinicLogoAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const ws = await getWorkspace();
+  if (!ws?.membership || ws.membership.role !== "owner") return DENIED;
+
+  const file = formData.get("logo");
+  if (!(file instanceof File) || file.size === 0) return { message: "Choose an image first." };
+  if (file.size > LOGO_MAX_BYTES) return { message: "The logo must be 1 MB or smaller." };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const type = sniffImageType(bytes);
+  if (!type) return { message: "Use a PNG, JPG or WebP image." };
+
+  const clinic = ws.membership.clinic;
+  const path = `${clinic.id}/logo-${Date.now()}.${LOGO_TYPES[type]}`;
+  const supabase = await createClient();
+  const upload = await supabase.storage
+    .from(LOGO_BUCKET)
+    .upload(path, bytes, { contentType: type, cacheControl: "31536000" });
+  if (upload.error) return { message: "We could not upload the logo. Please try again." };
+
+  const { data, error } = await supabase
+    .from("clinics")
+    .update({ logo_path: path })
+    .eq("id", clinic.id)
+    .select("id");
+  if (error || !data?.length) {
+    await supabase.storage.from(LOGO_BUCKET).remove([path]);
+    return { message: "We could not save the logo." };
+  }
+  if (clinic.logo_path) await supabase.storage.from(LOGO_BUCKET).remove([clinic.logo_path]);
+
+  await logAudit(supabase, clinic.id, "clinic.logo_updated", "clinic", clinic.id);
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Logo updated." };
+}
+
+export async function removeClinicLogoAction(): Promise<ActionState> {
+  const ws = await getWorkspace();
+  if (!ws?.membership || ws.membership.role !== "owner") return DENIED;
+  const clinic = ws.membership.clinic;
+  const supabase = await createClient();
+  const { error } = await supabase.from("clinics").update({ logo_path: null }).eq("id", clinic.id);
+  if (error) return { message: "We could not remove the logo." };
+  if (clinic.logo_path) await supabase.storage.from(LOGO_BUCKET).remove([clinic.logo_path]);
+  await logAudit(supabase, clinic.id, "clinic.logo_removed", "clinic", clinic.id);
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Logo removed." };
 }

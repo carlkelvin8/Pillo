@@ -114,7 +114,7 @@ export function CancelLinkButton({
     <form action={action}>
       <input type="hidden" name="paymentId" value={paymentId} />
       <input type="hidden" name="invoiceId" value={invoiceId} />
-      <SubmitButton variant="ghost" pendingLabel="Cancelling…">
+      <SubmitButton variant="ghost" pendingLabel="Cancelling…" className="w-full">
         Cancel link
       </SubmitButton>
       {state.message && !state.ok ? <FormMessage state={state} /> : null}
@@ -125,10 +125,12 @@ export function CancelLinkButton({
 function RecordForm({
   invoiceId,
   dueLabel,
+  today,
   onDone,
 }: {
   invoiceId: string;
   dueLabel: string;
+  today: string;
   onDone: () => void;
 }) {
   const [state, action] = useActionState<ActionState, FormData>(recordPaymentAction, {});
@@ -140,8 +142,10 @@ function RecordForm({
       <FormMessage state={state} />
       <input type="hidden" name="invoiceId" value={invoiceId} />
       <Field label="Method">
-        <Select name="method" defaultValue="cash">
+        <Select name="method" defaultValue={state.values?.method ?? "cash"}>
           <option value="cash">Cash</option>
+          <option value="gcash">GCash (received outside Pillo)</option>
+          <option value="maya">Maya (received outside Pillo)</option>
           <option value="bank">Bank transfer</option>
         </Select>
       </Field>
@@ -156,6 +160,18 @@ function RecordForm({
           required
           defaultValue={state.values?.amount}
           placeholder="0.00"
+        />
+      </Field>
+      <Field
+        label="Date received"
+        hint="Leave as today unless you are logging an earlier payment."
+        error={state.fieldErrors?.receivedOn?.[0]}
+      >
+        <Input
+          name="receivedOn"
+          type="date"
+          max={today}
+          defaultValue={state.values?.receivedOn ?? today}
         />
       </Field>
       <Field label="Reference (optional)" error={state.fieldErrors?.reference?.[0]}>
@@ -176,17 +192,28 @@ function RecordForm({
 export function RecordPaymentDialog({
   invoiceId,
   dueLabel,
+  today,
+  primary = false,
 }: {
   invoiceId: string;
   dueLabel: string;
+  /** Clinic-local "YYYY-MM-DD", the default and latest allowed date received. */
+  today: string;
+  primary?: boolean;
 }) {
   return (
     <FormDialog
       title="Record a payment"
-      description="For cash or bank transfers received outside the payment link."
-      trigger={<Button variant="ghost">Record cash or bank payment</Button>}
+      description="Log money the clinic already received. Pillo keeps the record; it does not collect payments yet."
+      trigger={
+        <Button variant={primary ? "primary" : "ghost"} className="py-2 whitespace-normal">
+          Record payment
+        </Button>
+      }
     >
-      {(close) => <RecordForm invoiceId={invoiceId} dueLabel={dueLabel} onDone={close} />}
+      {(close) => (
+        <RecordForm invoiceId={invoiceId} dueLabel={dueLabel} today={today} onDone={close} />
+      )}
     </FormDialog>
   );
 }

@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/settings/doctors", label: "Doctors" },
   { href: "/settings/notifications", label: "Notifications" },
   { href: "/settings/dr-pill", label: "Dr. Pill" },
+  { href: "/settings/subscription", label: "Plan and billing" },
 ] as const;
 
 export default async function SettingsLayout({ children }: { children: ReactNode }) {

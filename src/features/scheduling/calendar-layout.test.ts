@@ -1,29 +1,62 @@
 import { describe, expect, it } from "vitest";
-import { assignLanes, blockPosition, gridRange } from "./calendar-layout";
+import { assignLanes, blockPosition, calendarGrid } from "./calendar-layout";
 
 const TZ = "Asia/Manila";
 const at = (h: number, m = 0) => new Date(Date.UTC(2027, 0, 12, h - 8, m)).toISOString();
 
 describe("blockPosition", () => {
-  it("places a 9:00-10:00 block one hour below an 8 AM grid start", () => {
-    expect(blockPosition(at(9), at(10), TZ, 8)).toEqual({ top: 66, height: 60 }); // matches the design: top 66, height 60
+  it("aligns a booked block after a compact empty row", () => {
+    const appointment = { startsAt: at(9), endsAt: at(10) };
+    const grid = calendarGrid([{ start: "08:00", end: "10:00" }], [appointment], TZ);
+    expect(blockPosition(appointment, TZ, grid)).toEqual({ top: 42, height: 60 });
   });
-  it("scales with duration and has a minimum height", () => {
-    expect(blockPosition(at(9), at(9, 30), TZ, 8).height).toBe(28);
-    expect(blockPosition(at(9), at(9, 5), TZ, 8).height).toBe(24);
+
+  it("preserves the height of short appointments and keeps them inside the grid", () => {
+    const appointment = { startsAt: at(9, 45), endsAt: at(10) };
+    const grid = calendarGrid([], [appointment], TZ);
+    expect(blockPosition(appointment, TZ, grid)).toEqual({ top: 50, height: 24 });
+    expect(grid.height).toBe(76);
   });
 });
 
-describe("gridRange", () => {
-  it("defaults to 8 AM - 6 PM so a 5 PM row shows", () => {
-    expect(gridRange([], [], TZ)).toEqual({ startHour: 8, endHour: 18 });
+describe("calendarGrid", () => {
+  it("fits the range to opening hours and includes appointments outside those hours", () => {
+    const windows = [{ start: "09:00", end: "12:30" }];
+    expect(calendarGrid(windows, [], TZ).rows.map((row) => row.hour)).toEqual([9, 10, 11, 12]);
+    const appointments = [
+      { startsAt: at(8, 30), endsAt: at(9, 30) },
+      { startsAt: at(12, 30), endsAt: at(14) },
+    ];
+    expect(calendarGrid(windows, appointments, TZ).rows.map((row) => row.hour)).toEqual([
+      8, 9, 10, 11, 12, 13,
+    ]);
   });
-  it("widens for late hours and early or late appointments", () => {
-    expect(gridRange([{ start: "09:00", end: "19:30" }], [], TZ)).toEqual({
-      startHour: 8,
-      endHour: 20,
-    });
-    expect(gridRange([], [{ startsAt: at(7, 30), endsAt: at(8, 30) }], TZ).startHour).toBe(7);
+
+  it("compacts unbooked afternoon hours while keeping every open hour visible", () => {
+    const appointment = { startsAt: at(14, 45), endsAt: at(15, 30) };
+    const grid = calendarGrid([{ start: "13:00", end: "18:00" }], [appointment], TZ);
+    expect(grid.rows.map((row) => [row.hour, row.height])).toEqual([
+      [13, 40],
+      [14, 64],
+      [15, 64],
+      [16, 40],
+      [17, 40],
+    ]);
+    expect(grid.height).toBe(248);
+    expect(blockPosition(appointment, TZ, grid)).toEqual({ top: 90, height: 44 });
+  });
+
+  it("uses a compact daytime fallback when no hours or appointments are visible", () => {
+    const grid = calendarGrid([], [], TZ);
+    expect(grid.rows.map((row) => row.hour)).toEqual([8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
+    expect(grid.height).toBe(400);
+  });
+
+  it("keeps an appointment ending at midnight in its starting-day column", () => {
+    const appointment = { startsAt: at(23), endsAt: at(24) };
+    const grid = calendarGrid([], [appointment], TZ);
+    expect(grid.rows).toEqual([{ hour: 23, top: 0, height: 64 }]);
+    expect(blockPosition(appointment, TZ, grid)).toEqual({ top: 2, height: 60 });
   });
 });
 

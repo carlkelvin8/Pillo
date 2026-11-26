@@ -95,6 +95,8 @@ The AI receptionist. Genderless chibi capsule: mint top, white bottom, big gloss
 - **Provider payments:** a payment becomes `succeeded` only through `apply_provider_payment()` (service role only): idempotent per `(provider, event_id)`, refuses amount mismatches and unknown links, and records an audit entry. Clients can only create pending links or manual cash/bank payments, and can only cancel a pending link.
 - **PayMongo:** `src/features/payments/` has the provider interface, the link client, and webhook signature verification (HMAC-SHA256 of `t.rawBody`, 5-minute tolerance). The webhook route `/api/webhooks/paymongo` verifies on the RAW body before parsing, never logs the body, and uses the service-role client (`src/lib/supabase/service.ts`, the only place that bypasses RLS). The link description is just the invoice number: no patient data goes to the provider.
 - **Local development:** set `PAYMENTS_MODE=mock` (ignored in production) and `SUPABASE_SERVICE_ROLE_KEY` to get fake links at `/pay/mock/<ref>` that run the same webhook processing. Real PayMongo needs `PAYMONGO_SECRET_KEY`, `PAYMONGO_WEBHOOK_SECRET` and a public URL for the webhook.
+- **Record-only mode (current):** Pillo is a payment logbook until the business is registered with PayMongo. `onlinePaymentsEnabled()` (`src/config/features.ts`, env `ONLINE_PAYMENTS_ENABLED=true`) gates payment links; off by default, `requestPaymentAction` refuses and the UI shows "Online payments: coming soon" (GCash, QR Ph, Maya, cards). Staff record cash, bank, GCash or Maya received outside Pillo with a date (RLS allows manual `cash/bank/gcash/maya` only); recording also cancels a legacy pending link. The dashboard and `/payments` show "Recorded this month" instead of a balance.
+- **Clinic logo:** owners upload a PNG/JPG/WebP (≤1 MB, content-sniffed, no SVG) in Settings > Clinic profile to the public `clinic-logos` bucket (`<clinic_id>/logo-*.ext`, owner-only write policies); `clinics.logo_path` replaces the sidebar letter badge.
 - **Payouts are a DEMO** (`is_mock = true`): `request_payout()` checks the balance atomically but moves no money. The destination is only a label (last 4 digits); the form rejects long numbers. There is no money-sending anywhere else.
 - **Balance** = succeeded online (non-manual) payments minus payouts. Cash and bank transfers recorded by hand are collections but not part of the balance.
 
@@ -125,6 +127,8 @@ pnpm test      # unit (vitest, jsdom)
 pnpm test:db   # RLS tests on a throwaway local Postgres (needs postgres/initdb on PATH; no Docker)
 ```
 
+**QA login accounts:** run `pnpm seed:qa --yes` (idempotent, dev/QA project only). It creates or repairs `qa.owner1@`, `qa.recep1@`, `qa.doc1@example.com` (owner, receptionist, doctor) and a QA clinic. The shared password is `QA_SEED_PASSWORD` in the gitignored `.env.local`. Never ask the user for it or create new test accounts: re-run the seeder. Sample data: `scripts/seed-qa-dashboard-trends.sql`.
+
 `tests/db/supabase-stub.sql` stands in for Supabase's `auth` schema and roles. Once Docker/Supabase local runs, also run the migrations there (`supabase db reset`).
 
 ## Rules
@@ -135,6 +139,7 @@ pnpm test:db   # RLS tests on a throwaway local Postgres (needs postgres/initdb 
 - Money is integer centavos (`src/lib/money.ts`). Timezone Asia/Manila. Languages: English and Filipino (Taglish in Dr. Pill).
 - Medical data, RA 10173 principles: consent, minimal data, audit log on record reads, no patient names or contact details in application logs.
 - Dr. Pill never answers medical questions; it hands off to a human for medical advice, refunds and upset patients.
+- MCP connects through `DATABASE_URL_MCP` as the limited `pillo_mcp` role (no DELETE/DDL, column-level grants only; enable it once with `alter role pillo_mcp login password '...'`; required in production, dev falls back to `DATABASE_URL`). Tokens expire (30 days, 90 days or 1 year; DB cap 366 days) and the auth query rejects expired ones. Tests: `tests/db/mcp-runtime-role.test.ts`.
 - MCP has no money-sending tool. `request_payment` needs explicit staff approval in the app. Reading patient records is off by default. Every call goes to `audit_log`.
 - Use placeholders like `[YOUR EMAIL]`, `[YOUR PRICE]` for unknown business details. Do not invent facts, prices or statistics.
 - If a requirement is ambiguous or risky (money, medical data), stop and ask.

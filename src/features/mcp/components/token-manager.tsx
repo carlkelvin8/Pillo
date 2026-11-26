@@ -11,8 +11,10 @@ import type { ActionState } from "@/lib/action-state";
 import { createMcpTokenAction, revokeMcpTokenAction } from "../actions";
 import { formatDateShort, dateOf } from "@/lib/datetime";
 import { MCP_SCOPE_CATALOG } from "../catalog";
+import { MCP_EXPIRY_DAYS, tokenState } from "../expiry";
+import { Select } from "@/components/ui/input";
 
-type Token = { id: string; name: string; scopes: string[]; created_at: string; last_used_at: string | null; revoked_at: string | null };
+type Token = { id: string; name: string; scopes: string[]; created_at: string; last_used_at: string | null; revoked_at: string | null; expires_at: string };
 
 function CreateToken() {
   const [state, action] = useActionState<ActionState, FormData>(createMcpTokenAction, {});
@@ -23,6 +25,11 @@ function CreateToken() {
       <div><CardTitle>Create a client token</CardTitle><p className="text-muted mt-1 text-sm">New tokens start with no permissions. Select only what this client needs.</p></div>
       <form action={action} className="flex flex-col gap-4">
         <Field label="Token name"><Input name="name" required maxLength={80} placeholder="e.g. Clinic reporting assistant" /></Field>
+        <Field label="Expires" hint="Pick the shortest period that works. An expired token stops working and must be replaced.">
+          <Select name="expiresInDays" defaultValue="90">
+            {MCP_EXPIRY_DAYS.map((days) => <option key={days} value={days}>{days === 365 ? "1 year" : `${days} days`}</option>)}
+          </Select>
+        </Field>
         <fieldset className="flex flex-col gap-2">
           <legend className="mb-1 text-sm font-medium">Permissions</legend>
           {MCP_SCOPE_CATALOG.map((scope) => <label key={scope.scope} className="flex min-h-11 items-start gap-3 py-2 text-sm">
@@ -62,9 +69,12 @@ export function TokenManager({ tokens, timezone }: { tokens: Token[]; timezone: 
         {tokens.map((token) => <li key={token.id} className="flex flex-wrap items-center gap-4 py-4 first:pt-0 last:pb-0">
           <div className="min-w-0 flex-1"><p className="font-semibold">{token.name}</p>
             <p className="text-muted mt-1 text-sm">{token.scopes.length ? token.scopes.map((scope) => MCP_SCOPE_CATALOG.find((item) => item.scope === scope)?.label ?? scope).join(" · ") : "No scopes granted"}</p>
-            <p className="text-muted mt-1 text-xs">Created {formatDateShort(dateOf(token.created_at, timezone))}{token.last_used_at ? ` · Last used ${formatDateShort(dateOf(token.last_used_at, timezone))}` : " · Not used yet"}</p>
+            <p className="text-muted mt-1 text-xs">Created {formatDateShort(dateOf(token.created_at, timezone))}{` · ${tokenState(token) === "expired" ? "Expired" : "Expires"} ${formatDateShort(dateOf(token.expires_at, timezone))}`}{token.last_used_at ? ` · Last used ${formatDateShort(dateOf(token.last_used_at, timezone))}` : " · Not used yet"}</p>
           </div>
-          {token.revoked_at ? <span className="text-muted text-sm">Revoked</span> : <Revoke tokenId={token.id} />}
+          {tokenState(token) === "revoked" ? <span className="text-muted text-sm">Revoked</span> : <>
+            {tokenState(token) === "expired" ? <span className="bg-danger-chip text-danger-chip-ink rounded-full px-3 py-1 text-xs font-semibold">Expired</span> : null}
+            <Revoke tokenId={token.id} />
+          </>}
         </li>)}
       </ul>}
     </Card>

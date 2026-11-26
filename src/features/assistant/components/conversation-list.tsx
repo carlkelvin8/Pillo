@@ -89,7 +89,7 @@ export function ConversationList({
       ref={viewport}
       role="region"
       aria-label="Conversation list"
-      className="max-h-[min(72vh,52rem)] overflow-y-auto overscroll-contain"
+      className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
     >
       <ul className="flex flex-col">
         {items.map((item) => (

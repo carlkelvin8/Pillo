@@ -8,11 +8,10 @@ import { requireMembership } from "@/features/auth/workspace";
 import { getChairFillerSummary } from "@/features/chair-filler/queries";
 import { AppointmentsLineChart, CollectionsBarChart } from "@/features/dashboard/trend-charts";
 import { invoiceStats } from "@/features/invoices/queries";
-import { BalanceHero } from "@/features/payments/components/balance-hero";
+import { RecordedHero } from "@/features/payments/components/recorded-hero";
 import { dashboardAnalyticsLayout } from "@/features/dashboard/layout";
 import {
   collectionsData,
-  getBalance,
   listTransactions,
   sumOnDay,
 } from "@/features/payments/queries";
@@ -20,7 +19,7 @@ import { patientNames, patientStats } from "@/features/patients/queries";
 import { appointmentTrendRange } from "@/features/scheduling/dashboard-trend";
 import { listAppointments, monthlyAppointmentCounts } from "@/features/scheduling/queries";
 import { STATUS_LABEL, STATUS_TONE } from "@/features/scheduling/status";
-import { dayBoundsUtc, formatTime, lastMonths, todayIn, zonedToUtcIso } from "@/lib/datetime";
+import { dateOf, dayBoundsUtc, formatTime, lastMonths, todayIn, zonedToUtcIso } from "@/lib/datetime";
 import { formatPHP } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
@@ -28,11 +27,24 @@ export const metadata: Metadata = { title: "Dashboard" };
 
 const greeting = (hour: number) =>
   hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-function Tile({ label, value, hint }: { label: string; value: string; hint: string }) {
+function Tile({
+  label,
+  value,
+  hint,
+  quantityType,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  quantityType?: string;
+}) {
   return (
-    <Card className="flex flex-col gap-1 p-6">
+    <Card className="flex min-h-40 flex-col justify-center gap-2.5 p-7">
       <span className="text-muted text-sm">{label}</span>
-      <span className="tabular text-2xl font-semibold tracking-tight">{value}</span>
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <span className="tabular text-3xl font-semibold tracking-tight">{value}</span>
+        {quantityType ? <span className="text-muted text-sm">{quantityType}</span> : null}
+      </div>
       <span className="text-muted text-sm">{hint}</span>
     </Card>
   );
@@ -67,9 +79,8 @@ export default async function DashboardPage() {
   const { start, end } = dayBoundsUtc(today, tz);
 
   const showRecovered = can(role, "staff.manage");
-  const [balance, collections, tx, inv, todays, recovered, appointmentTrend, patients] =
+  const [collections, tx, inv, todays, recovered, appointmentTrend, patients] =
     await Promise.all([
-      showMoney ? getBalance(clinic.id) : Promise.resolve(0),
       showMoney ? collectionsData(clinic.id, sinceIso, tz) : Promise.resolve(null),
       showMoney ? listTransactions(clinic.id, 5) : Promise.resolve(null),
       showInvoices ? invoiceStats(clinic.id, today, monthStartIso) : Promise.resolve(null),
@@ -100,8 +111,11 @@ export default async function DashboardPage() {
   const remaining = todays.filter(
     (a) => a.ends_at > nowIso && (a.status === "scheduled" || a.status === "confirmed"),
   );
+  const thisMonth = today.slice(0, 7);
+  const recordedThisMonth = collections?.byMonth.get(thisMonth) ?? 0;
+  const recordedCount =
+    collections?.rows.filter((r) => dateOf(r.paid_at, tz).startsWith(thisMonth)).length ?? 0;
   const monthTotals = months.map((m) => collections?.byMonth.get(m) ?? 0);
-  const yearTotal = monthTotals.reduce((a, b) => a + b, 0);
   const canOpenPatients = can(role, "patients.directory");
   const analyticsLayout = dashboardAnalyticsLayout();
 
@@ -111,10 +125,8 @@ export default async function DashboardPage() {
 
       {showMoney ? (
         <div className={`grid items-stretch gap-6 ${analyticsLayout.columns}`}>
-          <BalanceHero centavos={balance} />
-          {collections ? (
-            <CollectionsBarChart months={months} values={monthTotals} total={yearTotal} />
-          ) : null}
+          <RecordedHero centavos={recordedThisMonth} count={recordedCount} />
+          {collections ? <CollectionsBarChart months={months} values={monthTotals} /> : null}
         </div>
       ) : null}
 
@@ -125,7 +137,7 @@ export default async function DashboardPage() {
         />
       ) : null}
 
-      <div className="grid items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid items-stretch gap-6 sm:grid-cols-2 2xl:grid-cols-5">
         {collectedToday ? (
           <Tile
             label="Collected today"
@@ -160,6 +172,7 @@ export default async function DashboardPage() {
             label="Appointments"
             value={String(todays.filter((a) => a.status !== "cancelled").length)}
             hint={`${remaining.length} remaining today`}
+            quantityType="appointments"
           />
         ) : null}
         {patients ? (
@@ -167,6 +180,7 @@ export default async function DashboardPage() {
             label="Registered patients"
             value={patients.total.toLocaleString("en-PH")}
             hint={`${patients.newThisMonth.toLocaleString("en-PH")} added this month`}
+            quantityType="patients"
           />
         ) : null}
       </div>

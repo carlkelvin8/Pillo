@@ -15,8 +15,14 @@ function installSpeech(voices: SpeechSynthesisVoice[]) {
     onerror: (() => void) | null = null;
     constructor(public text: string) {}
   }
-  Object.defineProperty(window, "SpeechSynthesisUtterance", { configurable: true, value: UtteranceMock });
-  Object.defineProperty(globalThis, "SpeechSynthesisUtterance", { configurable: true, value: UtteranceMock });
+  Object.defineProperty(window, "SpeechSynthesisUtterance", {
+    configurable: true,
+    value: UtteranceMock,
+  });
+  Object.defineProperty(globalThis, "SpeechSynthesisUtterance", {
+    configurable: true,
+    value: UtteranceMock,
+  });
   return speech;
 }
 
@@ -46,6 +52,8 @@ describe("ChatWindow read aloud", () => {
     expect(speech.cancel).toHaveBeenCalledTimes(1);
     const utterance = vi.mocked(speech.speak).mock.calls[0]?.[0] as SpeechSynthesisUtterance;
     expect(utterance.voice).toBe(localVoice);
+    expect(utterance.pitch).toBe(1.18);
+    expect(utterance.rate).toBe(0.94);
     expect(screen.getByRole("button", { name: "Stop reading message" })).toBeInTheDocument();
   });
 
@@ -64,13 +72,13 @@ describe("ChatWindow read aloud", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
-  it("keeps text only when the browser has no local voice", () => {
+  it("uses an available browser voice when no local voice is installed", () => {
     const speech = installSpeech([{ lang: "en-US", localService: false } as SpeechSynthesisVoice]);
     render(<ChatWindow slug="demo" clinicName="Demo Clinic" open />);
 
     fireEvent.click(screen.getByRole("button", { name: "Read message aloud" }));
 
-    expect(speech.speak).not.toHaveBeenCalled();
-    expect(screen.getByRole("status")).toHaveTextContent("No local voice is available");
+    expect(speech.speak).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });
