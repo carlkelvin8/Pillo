@@ -234,7 +234,7 @@
 }
 .story-h1 {
   /* Sized by width and height so the headline, copy and sign-up button fit in the first screen. */
-  font-size: clamp(2.5rem, min(6vw, 9vh), 5.6rem);
+  font-size: clamp(2.5rem, min(5.3vw, 8.6vh), 5rem);
   line-height: 0.98;
 }
 .story-h2 {
@@ -271,124 +271,6 @@
   height: 1px;
   background: currentColor;
   opacity: 0.5;
-}
-
-/* ---------- hero ---------- */
-.story-hero-bg {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.story-glow {
-  position: absolute;
-  right: -10%;
-  top: 8%;
-  width: min(60rem, 90vw);
-  aspect-ratio: 1;
-  border-radius: 999px;
-  background: radial-gradient(circle, var(--color-mint) 0%, transparent 68%);
-  transform: translate3d(0, calc(var(--p) * -140px), 0) scale(calc(1 + var(--p) * 0.4));
-}
-.story-capsule {
-  position: absolute;
-  width: var(--sz);
-  height: calc(var(--sz) * 2.1);
-  transform: translate3d(0, calc(var(--p) * var(--sp) * -300px), 0)
-    rotate(calc(var(--r) * 1deg + var(--p) * var(--sp) * 140deg));
-}
-.story-capsule-body {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border: 3px solid var(--color-ink);
-  border-radius: 999px;
-  background: linear-gradient(to bottom, var(--color-mint) 50%, var(--color-surface) 50%);
-  box-shadow: 0 16px 30px rgb(10 10 10 / 0.08);
-  animation: story-bob 7s ease-in-out infinite;
-  animation-delay: var(--d, 0s);
-}
-.story-hero-content {
-  opacity: calc(1 - var(--p) * 1.6);
-  transform: translate3d(0, calc(var(--p) * -80px), 0) scale(calc(1 - var(--p) * 0.08));
-  filter: blur(calc(var(--p) * 10px));
-}
-.story-mask {
-  display: inline-block;
-  overflow: hidden;
-  vertical-align: top;
-  padding-bottom: 0.1em;
-  margin-bottom: -0.1em;
-}
-.story-mask-in {
-  display: inline-block;
-  animation: story-word-up 1s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  animation-delay: calc(var(--i) * 80ms + 150ms);
-}
-.story-hero-chip,
-.story-hero-sub,
-.story-hero-cta {
-  animation: story-fade-up 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-.story-hero-chip {
-  animation-delay: 0ms;
-}
-.story-hero-sub {
-  animation-delay: 750ms;
-}
-.story-hero-cta {
-  animation-delay: 900ms;
-}
-.story-orbit {
-  min-height: 12rem;
-}
-.story-ring {
-  position: absolute;
-  border-radius: 999px;
-  border: 2px dashed var(--color-line-strong);
-}
-.story-ring-a {
-  inset: 4%;
-  animation: story-spin 48s linear infinite;
-}
-.story-ring-b {
-  inset: 18%;
-  animation: story-spin 32s linear infinite reverse;
-}
-.story-float {
-  position: absolute;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.5rem 0.9rem;
-  border: 1px solid;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  white-space: nowrap;
-  animation: story-bob 5s ease-in-out infinite;
-  animation-delay: var(--d, 0s);
-}
-.story-float svg {
-  width: 1rem;
-  height: 1rem;
-}
-.story-float-1 {
-  left: -2%;
-  top: 6%;
-}
-.story-float-2 {
-  right: -3%;
-  top: 36%;
-}
-.story-float-3 {
-  bottom: 6%;
-  left: 8%;
-}
-.story-scroll-cue {
-  opacity: calc(1 - var(--p) * 8);
-}
-.story-scroll-cue svg {
-  animation: story-nudge 1.6s ease-in-out infinite;
 }
 
 /* ---------- marquee bands ---------- */
@@ -1143,34 +1025,34 @@
   }
 }
 
+
+@keyframes story-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  80%,
+  100% {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+@keyframes story-pop {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* One-shot row story (6.4s): confirmed -> cancelled -> open slot + offer -> filled. It rests on "filled". */
+
+/* One-shot story (6.4s): a booked slot is cancelled, circled, and a waitlist pill rolls in. It rests on "filled". */
+
 /* ---------- small screens: keep every pinned scene inside one screen ---------- */
 @media (max-width: 639px) {
-  .story-hero-content {
-    gap: clamp(0.25rem, 1svh, 0.75rem);
-    padding-top: clamp(4rem, 11svh, 5rem);
-  }
-  .story-hero-content > div:first-child {
-    gap: clamp(0.65rem, 1.7svh, 1rem);
-  }
-  .story-h1 {
-    font-size: clamp(2rem, 9.5vw, 2.75rem);
-    line-height: 1.02;
-  }
-  .story-hero-sub {
-    font-size: clamp(0.9rem, 3.8vw, 1rem);
-    line-height: 1.4;
-  }
-  .story-orbit {
-    width: min(42vw, 10rem);
-    min-height: 0;
-  }
-  .story-float {
-    padding: 0.4rem 0.65rem;
-    font-size: 0.68rem;
-  }
-  .story-scroll-cue {
-    display: none;
-  }
   .story-card {
     padding: 0.8rem;
   }
@@ -1181,68 +1063,6 @@
   }
   .story-ledger-row {
     padding-block: 0.45rem;
-  }
-  .story-float-2 {
-    display: none;
-  }
-}
-
-@media (max-width: 639px) and (max-height: 650px) {
-  .story-hero-content {
-    gap: 0.25rem;
-    padding-top: 4rem;
-  }
-  .story-hero-content > div:first-child {
-    gap: 0.6rem;
-  }
-  .story-h1 {
-    font-size: clamp(1.875rem, 9vw, 2.25rem);
-  }
-  .story-hero-sub {
-    font-size: 0.875rem;
-  }
-  .story-orbit {
-    width: min(34vw, 8rem);
-  }
-  .story-float {
-    display: none;
-  }
-}
-
-/* ---------- tablets in portrait: a smaller orbit keeps the headline clear of the header ---------- */
-@media (min-width: 640px) and (max-width: 1023px) {
-  .story-orbit {
-    max-width: 15rem;
-  }
-  .story-orbit .story-spot {
-    width: 7rem;
-  }
-}
-
-/* ---------- landscape phones: short screens get a two-column hero so the headline and button stay in view ---------- */
-@media (orientation: landscape) and (max-height: 520px) {
-  .story-hero-content {
-    grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.5fr);
-    gap: 1rem;
-    padding-top: 4.75rem;
-  }
-  .story-hero-content > div:first-child {
-    gap: 0.6rem;
-  }
-  .story-h1 {
-    font-size: clamp(1.75rem, 9vh, 2.6rem);
-  }
-  .story-hero-sub,
-  .story-float,
-  .story-scroll-cue {
-    display: none;
-  }
-  .story-orbit {
-    max-width: 8rem;
-    min-height: 0;
-  }
-  .story-orbit .story-spot {
-    width: 5rem;
   }
 }
 
@@ -1263,10 +1083,7 @@
     transform: none;
     border-radius: 0;
   }
-  .story-hero-content,
-  .story-finale-title,
-  .story-capsule,
-  .story-glow {
+  .story-finale-title {
     opacity: 1;
     transform: none;
     filter: none;
@@ -1281,9 +1098,6 @@
   .story-now,
   .story-step-body {
     opacity: 1;
-  }
-  .story-scroll-cue {
-    display: none;
   }
 }
 
@@ -1303,7 +1117,7 @@
   transform: none;
   border-radius: 0;
 }
-.story-root[data-motion="reduced"] :is(.story-hero-content, .story-finale-title, .story-capsule, .story-glow) {
+.story-root[data-motion="reduced"] .story-finale-title {
   opacity: 1;
   transform: none;
   filter: none;
@@ -1316,9 +1130,6 @@
 }
 .story-root[data-motion="reduced"] :is(.story-now, .story-step-body) {
   opacity: 1;
-}
-.story-root[data-motion="reduced"] .story-scroll-cue {
-  display: none;
 }
 
 /*
