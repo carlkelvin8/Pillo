@@ -78,7 +78,7 @@ export const recordPaymentSchema = z.object({
     .string()
     .trim()
     .transform((v) => (v === "" ? undefined : v))
-    .refine((v) => v === undefined || /^\d{4}-\d{2}-\d{2}$/.test(v), "Pick a valid date.")
+    .refine((v) => v === undefined || isDateString(v), "Pick a valid date.")
     .optional(),
   reference: z
     .string()

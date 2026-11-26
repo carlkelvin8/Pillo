@@ -68,7 +68,7 @@ describe("pillo_mcp role: allowed statements (everything src/features/mcp issues
       expect(rows).toHaveLength(1);
       const upd = await tx`update public.mcp_tokens set last_used_at = now() where id = ${tokenId} and clinic_id = ${clinic} returning id`;
       expect(upd).toHaveLength(1);
-    });
+    }, { clinicId: clinic, tokenHash: "b".repeat(64) });
   });
 
   it("reads schedule, clinic and patient data it exposes", async () => {
@@ -81,7 +81,30 @@ describe("pillo_mcp role: allowed statements (everything src/features/mcp issues
       expect(rows).toHaveLength(1);
       await tx`select coalesce(sum(amount_centavos),0)::bigint from public.payments where clinic_id = ${clinic} and status = 'succeeded' and paid_at >= now() - interval '1 day'`;
       await tx`select status, count(*)::int from public.invoices where clinic_id = ${clinic} group by status`;
-    });
+    }, { clinicId: clinic });
+  });
+
+  it("cannot read another clinic's rows", async () => {
+    const crossClinic = await asMcpRuntime(
+      (tx) => tx`select id from public.clinics where id = ${other}`,
+      { clinicId: clinic },
+    );
+    expect(crossClinic).toHaveLength(0);
+  });
+
+  it("cannot write rows for another clinic", async () => {
+    await expect(
+      asMcpRuntime((tx) => tx`
+        insert into public.agent_actions (clinic_id, kind, status, autonomy, payload, outcome)
+        values (${other}, 'mcp_request_payment', 'proposed', 'approve', '{}'::jsonb, 'Waiting')
+      `, { clinicId: clinic }),
+    ).rejects.toMatchObject({ code: "42501" });
+  });
+
+  it("cannot read appointment reason", async () => {
+    await expect(
+      asMcpRuntime((tx) => tx`select reason from public.appointments where clinic_id = ${clinic}`, { clinicId: clinic }),
+    ).rejects.toMatchObject({ code: "42501" });
   });
 
   it("books and reschedules an appointment", async () => {
@@ -93,7 +116,7 @@ describe("pillo_mcp role: allowed statements (everything src/features/mcp issues
       const moved = await tx`update public.appointments set starts_at = now() + interval '3 days', ends_at = now() + interval '3 days 30 minutes'
                              where clinic_id = ${clinic} and id = ${row!.id} returning id`;
       expect(moved).toHaveLength(1);
-    });
+    }, { clinicId: clinic });
   });
 
   it("creates a draft invoice with items (totals derived by triggers) and a payment request", async () => {
@@ -103,16 +126,20 @@ describe("pillo_mcp role: allowed statements (everything src/features/mcp issues
                values (${clinic}, ${inv!.id}, 0, 'Cleaning', 2, 50000)`;
       const [row] = await tx<{ total_centavos: string }[]>`select total_centavos from public.invoices where id = ${inv!.id} and clinic_id = ${clinic}`;
       expect(Number(row?.total_centavos)).toBe(100000);
-      await tx`insert into public.agent_actions (clinic_id, kind, status, autonomy, payload, outcome)
-               values (${clinic}, 'mcp_request_payment', 'proposed', 'approve', jsonb_build_object('invoice_id', ${inv!.id}::text), 'Waiting for staff approval')`;
-    });
+      const [proposal] = await tx<{ id: string; status: string }[]>`
+        insert into public.agent_actions (clinic_id, kind, status, autonomy, payload, outcome)
+        values (${clinic}, 'mcp_request_payment', 'proposed', 'approve', jsonb_build_object('invoice_id', ${inv!.id}::text), 'Waiting for staff approval')
+        returning id, status
+      `;
+      expect(proposal).toEqual({ id: expect.any(String), status: "proposed" });
+    }, { clinicId: clinic });
   });
 
   it("writes the audit entry", async () => {
     await asMcpRuntime(async (tx) => {
       await tx`insert into public.audit_log (clinic_id, actor_type, action, entity, entity_id, meta)
                values (${clinic}, 'mcp', 'mcp.tool_called', 'mcp_token', ${tokenId}, jsonb_build_object('tool', 'x', 'outcome', 'success'))`;
-    });
+    }, { clinicId: clinic });
   });
 });
 

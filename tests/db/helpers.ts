@@ -30,8 +30,17 @@ export async function asAnon<T>(fn: (tx: Sql) => Promise<T>): Promise<T> {
 }
 
 /** Run `fn` as the least-privilege MCP runtime role. Always rolls back. */
-export async function asMcpRuntime<T>(fn: (tx: Sql) => Promise<T>): Promise<T> {
-  return runRolledBack("pillo_mcp", {}, fn);
+export async function asMcpRuntime<T>(
+  fn: (tx: Sql) => Promise<T>,
+  context: { clinicId?: string; tokenHash?: string } = {},
+): Promise<T> {
+  return runRolledBack("pillo_mcp", {}, async (tx) => {
+    if (context.tokenHash)
+      await tx`select set_config('app.mcp_token_hash', ${context.tokenHash}, true)`;
+    if (context.clinicId)
+      await tx`select set_config('app.mcp_clinic_id', ${context.clinicId}, true)`;
+    return fn(tx);
+  });
 }
 
 class Rollback<T> extends Error {

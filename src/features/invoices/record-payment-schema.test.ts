@@ -23,7 +23,7 @@ describe("recordPaymentSchema", () => {
   });
 
   it("rejects malformed dates", () => {
-    for (const receivedOn of ["20-11-2026", "yesterday", "2026-1-1"]) {
+    for (const receivedOn of ["20-11-2026", "yesterday", "2026-1-1", "2026-02-31"]) {
       expect(recordPaymentSchema.safeParse({ ...base, method: "cash", receivedOn }).success).toBe(
         false,
       );

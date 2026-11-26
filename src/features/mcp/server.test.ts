@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const execute = vi.hoisted(() => vi.fn().mockResolvedValue([]));
 const transaction = vi.hoisted(() => vi.fn());
+const withMcpClinic = vi.hoisted(() => vi.fn());
 const audit = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
-vi.mock("./database", () => ({ mcpDatabase: () => ({ execute, transaction }) }));
+vi.mock("./database", () => ({ withMcpClinic }));
 vi.mock("./audit", () => ({ auditMcpCall: audit }));
 
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
@@ -45,6 +46,7 @@ describe("MCP Streamable HTTP server", () => {
     execute.mockReset().mockResolvedValue([]);
     transaction.mockReset();
     transaction.mockImplementation((work: (tx: { execute: typeof execute }) => Promise<unknown>) => work({ execute }));
+    withMcpClinic.mockReset().mockImplementation((_clinicId: string, work: (tx: { execute: typeof execute }) => Promise<unknown>) => transaction(work));
     audit.mockClear();
   });
 
@@ -110,6 +112,7 @@ describe("MCP Streamable HTTP server", () => {
     }, "2025-06-18");
     const result = response.body.result as { content: { text: string }[] };
     expect(JSON.parse(result.content[0]!.text)).toMatchObject([{ id: "patient-id", full_name: "Sample Patient" }]);
+    expect(withMcpClinic).toHaveBeenCalledWith(auth.clinicId, expect.any(Function));
     const query = new PgDialect().sqlToQuery(execute.mock.calls[0]![0] as SQL);
     expect(query.sql).toMatch(/clinic_id/);
     expect(query.sql).toMatch(/limit 25/i);
