@@ -44,7 +44,7 @@ export function ControlScene() {
           <MascotSpot
             mood="happy"
             rotate={-8}
-            className="absolute -top-11 -right-2 z-10 w-14 sm:-top-14 sm:w-24"
+            className="absolute -top-11 -right-2 z-10 w-14 sm:-top-[4.5rem] sm:-right-4 sm:w-24"
           />
           <div className="story-card story-log" data-tilt="">
             <div className="flex items-center justify-between gap-3 pb-3">

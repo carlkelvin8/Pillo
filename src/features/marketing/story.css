@@ -233,7 +233,8 @@
   text-wrap: balance;
 }
 .story-h1 {
-  font-size: clamp(2.5rem, 8.4vw, 6.4rem);
+  /* Sized by width and height so the headline, copy and sign-up button fit in the first screen. */
+  font-size: clamp(2.5rem, min(6vw, 9vh), 5.6rem);
   line-height: 0.98;
 }
 .story-h2 {
@@ -512,9 +513,15 @@
 .story-step-body {
   color: var(--color-faint);
 }
+/* One-line progress caption for phones (the numbered list is for wider screens). */
 .story-now {
-  display: grid;
+  display: none;
   font-weight: 600;
+}
+@media (max-width: 639px) {
+  .story-now {
+    display: grid;
+  }
 }
 .story-now > span {
   grid-area: 1 / 1;
@@ -553,6 +560,8 @@
   font-weight: 600;
 }
 .story-row-hero {
+  /* Above the rows below it, so the flying offer is visible while it travels up. */
+  z-index: 3;
   overflow: visible;
 }
 .story-row-bg {
@@ -585,7 +594,7 @@
   white-space: nowrap;
 }
 .story-label-a {
-  opacity: calc(1 - clamp(0, (var(--p) - 0.14) / 0.04, 1));
+  opacity: calc(1 - clamp(0, (var(--p) - 0.26) / 0.04, 1));
   text-decoration: line-through;
   text-decoration-color: color-mix(in srgb, var(--color-danger-chip-ink) calc(clamp(0, (var(--p) - 0.14) / 0.04, 1) * 100%), transparent);
 }
@@ -1161,7 +1170,7 @@
     padding-block: 0.45rem;
   }
   .story-float-2 {
-    right: 0;
+    display: none;
   }
 }
 
@@ -1184,6 +1193,33 @@
   }
   .story-float {
     display: none;
+  }
+}
+
+/* ---------- landscape phones: short screens get a two-column hero so the headline and button stay in view ---------- */
+@media (orientation: landscape) and (max-height: 520px) {
+  .story-hero-content {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.5fr);
+    gap: 1rem;
+    padding-top: 4.75rem;
+  }
+  .story-hero-content > div:first-child {
+    gap: 0.6rem;
+  }
+  .story-h1 {
+    font-size: clamp(1.75rem, 9vh, 2.6rem);
+  }
+  .story-hero-sub,
+  .story-float,
+  .story-scroll-cue {
+    display: none;
+  }
+  .story-orbit {
+    max-width: 8rem;
+    min-height: 0;
+  }
+  .story-orbit .story-spot {
+    width: 5rem;
   }
 }
 

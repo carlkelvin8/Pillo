@@ -57,7 +57,7 @@ export function DeskScene() {
           <MascotSpot
             mood="talking"
             rotate={-8}
-            className="absolute -top-9 -right-6 z-10 w-14 sm:top-auto sm:-bottom-3 sm:-left-16 sm:w-24"
+            className="absolute -top-9 -right-6 z-10 w-14 sm:top-auto sm:-bottom-3 sm:-left-24 sm:w-24"
           />
           <div className="story-phone" data-tilt="">
             <div className="story-phone-bar">
