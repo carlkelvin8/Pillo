@@ -80,7 +80,7 @@ describe("clinic timezone conversion", () => {
     expect(formatTime("2027-01-12T07:15:00.000Z", TZ)).toBe("3:15 PM");
   });
   it("formats week ranges", () => {
-    expect(formatWeekRange("2026-11-23", "2026-11-27")).toBe("23 – 27 November");
-    expect(formatWeekRange("2026-11-30", "2026-12-04")).toBe("30 November – 4 December");
+    expect(formatWeekRange("2026-11-23", "2026-11-27")).toBe("23 to 27 November");
+    expect(formatWeekRange("2026-11-30", "2026-12-04")).toBe("30 November to 4 December");
   });
 });

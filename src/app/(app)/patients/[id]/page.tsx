@@ -79,12 +79,12 @@ export default async function PatientRecordPage({ params }: Props) {
       value:
         latestVitals?.bp_systolic !== undefined && latestVitals.bp_diastolic !== undefined
           ? `${latestVitals.bp_systolic}/${latestVitals.bp_diastolic}`
-          : "—",
+          : "Not recorded",
       unit: "mmHg",
     },
-    { label: "Heart rate", value: latestVitals?.heart_rate?.toString() ?? "—", unit: "bpm" },
-    { label: "Weight", value: latestVitals?.weight_kg?.toString() ?? "—", unit: "kg" },
-    { label: "Temperature", value: latestVitals?.temp_c?.toString() ?? "—", unit: "°C" },
+    { label: "Heart rate", value: latestVitals?.heart_rate?.toString() ?? "Not recorded", unit: "bpm" },
+    { label: "Weight", value: latestVitals?.weight_kg?.toString() ?? "Not recorded", unit: "kg" },
+    { label: "Temperature", value: latestVitals?.temp_c?.toString() ?? "Not recorded", unit: "°C" },
   ];
 
   return (
@@ -221,11 +221,11 @@ export default async function PatientRecordPage({ params }: Props) {
             <dl className="flex flex-col gap-3 text-sm">
               <div>
                 <dt className="text-muted">Phone</dt>
-                <dd className="font-medium">{patient.phone ?? "—"}</dd>
+                <dd className="font-medium">{patient.phone ?? "Not provided"}</dd>
               </div>
               <div>
                 <dt className="text-muted">Email</dt>
-                <dd className="font-medium break-all">{patient.email ?? "—"}</dd>
+                <dd className="font-medium break-all">{patient.email ?? "Not provided"}</dd>
               </div>
               <div>
                 <dt className="text-muted">Consent</dt>

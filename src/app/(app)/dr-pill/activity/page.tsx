@@ -156,7 +156,7 @@ export default async function ActivityPage({ searchParams }: Props) {
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold">{KIND_LABEL[a.kind] ?? a.kind}</p>
                   <p className="text-muted text-sm">
-                    {a.outcome ?? "—"} ·{" "}
+                    {a.outcome ?? "No outcome"} ·{" "}
                     <span className="tabular">
                       {formatDateShort(dateOf(a.created_at, tz))}, {formatTime(a.created_at, tz)}
                     </span>
@@ -196,7 +196,7 @@ export default async function ActivityPage({ searchParams }: Props) {
           className="border-line flex flex-wrap items-center justify-between gap-3 border-t pt-4"
         >
           <span className="text-muted text-sm">
-            Showing {actionTotal === 0 ? 0 : (page - 1) * ACTION_PAGE_SIZE + 1}–
+            Showing {actionTotal === 0 ? 0 : (page - 1) * ACTION_PAGE_SIZE + 1} to{" "}
             {Math.min(page * ACTION_PAGE_SIZE, actionTotal)} of {actionTotal} · {ACTION_PAGE_SIZE}{" "}
             per page
           </span>

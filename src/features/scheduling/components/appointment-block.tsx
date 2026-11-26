@@ -89,7 +89,7 @@ function Details({ block, onDone }: { block: BlockData; onDone: () => void }) {
         </div>
         <div>
           <dt className="text-muted">Reason</dt>
-          <dd className="font-medium">{block.reason ?? "—"}</dd>
+          <dd className="font-medium">{block.reason ?? "No reason given"}</dd>
         </div>
       </dl>
       <div className="flex flex-wrap items-center gap-2">

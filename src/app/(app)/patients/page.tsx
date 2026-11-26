@@ -187,10 +187,10 @@ export default async function PatientsPage({ searchParams }: Props) {
                       </Link>
                     </Td>
                     <Td className="tabular text-ink-2 hidden sm:table-cell">
-                      {s?.last ? formatDateShort(dateOf(s.last, tz)) : "—"}
+                      {s?.last ? formatDateShort(dateOf(s.last, tz)) : "None"}
                     </Td>
                     <Td className="tabular text-ink-2 hidden sm:table-cell">
-                      {s?.next ? formatDateShort(dateOf(s.next, tz)) : "—"}
+                      {s?.next ? formatDateShort(dateOf(s.next, tz)) : "None"}
                     </Td>
                     <Td className="px-2 text-right sm:px-4">
                       <Button asChild variant="ghost" className="px-3">
@@ -217,7 +217,7 @@ export default async function PatientsPage({ searchParams }: Props) {
           className="flex flex-wrap items-center justify-between gap-3 px-2 pb-2"
         >
           <span className="tabular text-muted text-sm">
-            Showing {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–
+            Showing {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1} to{" "}
             {Math.min(page * PAGE_SIZE, total)} of {total} · {PAGE_SIZE} per page
           </span>
           <div className="flex items-center gap-2">
