@@ -1,4 +1,5 @@
--- Development-only fixture for the QA Dental Clinic dashboard.
+-- Development-only fixture for the QA clinic dashboard (the clinic owned by qa.owner1@example.com,
+-- as created or reused by scripts/seed-qa.ts; run that first).
 -- Creates synthetic patient, completed appointment, invoice, and manual cash payment rows.
 -- Idempotent by the QA Trend Test patient names and invoice notes. Never run in production.
 -- Run through psql only, with: psql -v allow_qa_trend_seed=on -f scripts/seed-qa-dashboard-trends.sql
@@ -30,15 +31,21 @@ declare
   v_note text;
   v_created integer;
 begin
-  select count(*) into v_clinic_count
-  from public.clinics
-  where name = 'Dental Clinic';
+  select count(distinct m.clinic_id) into v_clinic_count
+  from public.memberships m
+  join auth.users u on u.id = m.user_id
+  where lower(u.email) = 'qa.owner1@example.com' and m.role = 'owner';
 
-  if v_clinic_count <> 1 then
-    raise exception 'Expected exactly one development clinic named Dental Clinic; found %', v_clinic_count;
+  if v_clinic_count < 1 then
+    raise exception 'Expected qa.owner1@example.com to own a clinic (run pnpm seed:qa first); found none';
   end if;
 
-  select id into v_clinic_id from public.clinics where name = 'Dental Clinic';
+  select m.clinic_id into v_clinic_id
+  from public.memberships m
+  join auth.users u on u.id = m.user_id
+  where lower(u.email) = 'qa.owner1@example.com' and m.role = 'owner'
+  order by m.created_at, m.id
+  limit 1;
   select id into v_branch_id
   from public.branches
   where clinic_id = v_clinic_id

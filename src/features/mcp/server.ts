@@ -4,6 +4,7 @@ import { z } from "zod";
 import { dayBoundsUtc, isDateString } from "@/lib/datetime";
 import { isOpenSlot, type HourWindow } from "@/features/scheduling/slots";
 import { APP_NAME } from "@/config/brand";
+import { onlinePaymentsEnabled } from "@/config/features";
 import { withMcpClinic, type McpQueryDb } from "./database";
 import type { McpAuth } from "./auth";
 import { auditMcpCall } from "./audit";
@@ -64,18 +65,44 @@ async function assertOpenSlot(db: McpQueryDb, args: {
   }, args.startsAt)) throw new Error("That time is not an available appointment slot.");
 }
 
-async function run<T>(auth: McpAuth, tool: string, work: (db: McpQueryDb) => Promise<T>) {
+/** Message safe to show an MCP client: our own Errors pass through, database errors are mapped. */
+export function safeToolMessage(error: unknown): string {
+  if (error instanceof Error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code !== "string" || code.length !== 5) return error.message;
+    return code === "23P01" ? "That time is no longer available." : "The request could not be completed.";
+  }
+  if (typeof error === "object" && error !== null) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "string" && code.length === 5)
+      return code === "23P01" ? "That time is no longer available." : "The request could not be completed.";
+  }
+  return "The request could not be completed.";
+}
+
+/** Audit is best-effort after the work has committed: it never changes the tool result. */
+async function auditBestEffort(auth: McpAuth, tool: string, outcome: "success" | "failure") {
   try {
-    const result = await withMcpClinic(auth.clinicId, work);
-    await auditMcpCall(auth, tool, "success");
-    return { content: [{ type: "text" as const, text: toText(result) }] };
+    await auditMcpCall(auth, tool, outcome);
   } catch (error) {
-    await auditMcpCall(auth, tool, "failure");
+    const code = typeof (error as { code?: unknown } | null)?.code === "string" ? (error as { code: string }).code : "unknown";
+    console.error(`mcp audit failed (code ${code})`);
+  }
+}
+
+async function run<T>(auth: McpAuth, tool: string, work: (db: McpQueryDb) => Promise<T>) {
+  let result: T;
+  try {
+    result = await withMcpClinic(auth.clinicId, work);
+  } catch (error) {
+    await auditBestEffort(auth, tool, "failure");
     return {
       isError: true,
-      content: [{ type: "text" as const, text: error instanceof Error ? error.message : "Tool failed." }],
+      content: [{ type: "text" as const, text: safeToolMessage(error) }],
     };
   }
+  await auditBestEffort(auth, tool, "success");
+  return { content: [{ type: "text" as const, text: toText(result) }] };
 }
 
 function requireScope(auth: McpAuth, scope: string) {
@@ -223,6 +250,7 @@ export function buildMcpServer(auth: McpAuth) {
     { description: "Ask staff to approve creating a payment link. This tool never creates a link.", inputSchema: z.object({ invoice_id: id }) },
     (input) => run(auth, "request_payment", async (db) => {
       requireScope(auth, "payments:request");
+      if (!onlinePaymentsEnabled()) throw new Error("Online payment requests are not available yet.");
       const [invoice] = await db.execute(sql`select id, invoice_number, total_centavos, status from public.invoices where clinic_id=${auth.clinicId} and id=${input.invoice_id} limit 1`);
       if (!invoice || !["draft", "sent"].includes(String(invoice.status))) throw new Error("Invoice is not payable.");
       const [paymentTotals] = await db.execute(sql`select coalesce(sum(amount_centavos), 0)::bigint as paid_centavos from public.payments where clinic_id=${auth.clinicId} and invoice_id=${input.invoice_id} and status='succeeded'`);

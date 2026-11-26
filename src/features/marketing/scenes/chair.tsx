@@ -25,7 +25,7 @@ export function ChairScene() {
           <h2 id="chair-title" className="story-h2">
             <Words text="A patient cancels. The chair sits empty. Not anymore." start={0} length={0.2} />
           </h2>
-          <ol className="story-steps hidden flex-col gap-4 sm:flex">
+          <ol className="story-steps story-sm-sr flex flex-col gap-4">
             {STEPS.map((step, i) => (
               <li key={step.title} className="story-step fx" style={at(step.s, 0.08)}>
                 <span className="story-step-n tabular">{i + 1}</span>

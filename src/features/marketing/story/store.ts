@@ -104,3 +104,16 @@ export function hasFinePointer(): boolean {
     ? window.matchMedia("(hover: hover) and (pointer: fine)").matches
     : false;
 }
+
+/** True when the scroll engine can run: observers exist and the visitor did not ask for less motion. */
+export function motionSupported(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof IntersectionObserver !== "undefined" &&
+    typeof ResizeObserver !== "undefined" &&
+    !prefersReducedMotion()
+  );
+}
+
+/** Short screens where pinned scenes would clip (the landing page then shows their finished state). */
+export const COMPACT_QUERY = "(max-height: 640px)";

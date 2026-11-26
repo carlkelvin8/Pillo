@@ -68,6 +68,7 @@ export function HeaderSearch({ className = "" }: HeaderSearchProps) {
   };
 
   const visible = ready ? results : [];
+  const listRendered = open && ready;
   const status = !ready
     ? ""
     : loading
@@ -79,7 +80,14 @@ export function HeaderSearch({ className = "" }: HeaderSearchProps) {
           : `${visible.length} ${visible.length === 1 ? "result" : "results"}`;
 
   return (
-    <div ref={rootRef} className={`relative min-w-0 max-w-90 flex-1 ${className}`}>
+    <div
+      ref={rootRef}
+      onBlur={(event) => {
+        const next = event.relatedTarget as Node | null;
+        if (next && !event.currentTarget.contains(next)) setOpen(false);
+      }}
+      className={`relative min-w-0 max-w-90 flex-1 ${className}`}
+    >
       <div className="rounded-control border-line bg-surface focus-within:outline-ink flex min-h-11 items-center gap-2.5 border px-4 focus-within:outline-2 focus-within:outline-offset-2">
         <Search className="text-muted size-4 shrink-0" aria-hidden="true" />
         <input
@@ -87,7 +95,7 @@ export function HeaderSearch({ className = "" }: HeaderSearchProps) {
           role="combobox"
           aria-label="Search patients and invoices"
           aria-expanded={open && ready}
-          aria-controls={listId}
+          aria-controls={listRendered ? listId : undefined}
           aria-autocomplete="list"
           aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
           autoComplete="off"
@@ -95,6 +103,8 @@ export function HeaderSearch({ className = "" }: HeaderSearchProps) {
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
+            setResults([]);
+            setActive(-1);
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
@@ -108,9 +118,13 @@ export function HeaderSearch({ className = "" }: HeaderSearchProps) {
             } else if (event.key === "ArrowUp" && visible.length) {
               event.preventDefault();
               setActive((i) => (i <= 0 ? visible.length - 1 : i - 1));
-            } else if (event.key === "Enter" && active >= 0 && visible[active]) {
-              event.preventDefault();
-              go(visible[active]);
+            } else if (event.key === "Enter") {
+              const target = active >= 0 ? visible[active] : undefined;
+              if (target) {
+                event.preventDefault();
+                // A request is pending or the list belongs to an older query: do nothing yet.
+                if (!loading) go(target);
+              }
             }
           }}
           className="placeholder:text-muted w-full min-w-0 bg-transparent text-sm outline-none"

@@ -75,6 +75,19 @@ describe("assignLanes", () => {
     ]);
   });
 
+  it("separates back-to-back short appointments that would visually overlap", () => {
+    const short = (id: string, from: number, m: number) => ({
+      id,
+      startsAt: at(from, m),
+      endsAt: at(from, m + 15),
+    });
+    const out = assignLanes([short("a", 9, 0), short("b", 9, 15)]);
+    expect(out.map((o) => [o.id, o.lane, o.lanes])).toEqual([
+      ["a", 0, 2],
+      ["b", 1, 2],
+    ]);
+  });
+
   it("puts overlapping appointments side by side", () => {
     const out = assignLanes([appt("a", 9, 11), appt("b", 10, 11)]);
     expect(out.map((o) => [o.id, o.lane, o.lanes])).toEqual([

@@ -41,7 +41,7 @@ export function DeskScene() {
           <h2 id="desk-title" className="story-h2">
             <Words text="A front desk that never clocks out." start={0} length={0.2} />
           </h2>
-          <ul className="hidden flex-col gap-3 sm:flex">
+          <ul className="story-sm-sr flex flex-col gap-3">
             {POINTS.map((point) => (
               <li key={point.text} className="story-point fx" style={at(point.s, 0.08)}>
                 <span className="story-point-check">
@@ -57,7 +57,7 @@ export function DeskScene() {
           <MascotSpot
             mood="talking"
             rotate={-8}
-            className="absolute -top-9 -right-6 z-10 w-14 sm:top-auto sm:-bottom-3 sm:-left-16 sm:w-24"
+            className="absolute -top-9 -right-6 z-10 w-14 sm:top-auto sm:-bottom-3 sm:-left-24 sm:w-24"
           />
           <div className="story-phone" data-tilt="">
             <div className="story-phone-bar">

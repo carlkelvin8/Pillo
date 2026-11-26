@@ -29,6 +29,8 @@ type Script = {
   busy?: unknown[];
   hours?: unknown[];
   insertError?: { code: string } | null;
+  clinicError?: boolean;
+  hoursThrow?: boolean;
 };
 function fake(s: Script) {
   const calls: Call[] = [];
@@ -51,6 +53,9 @@ function fake(s: Script) {
         String(selection).includes("website_url")
       )
         return { data: null, error: { code: "42703" } };
+      if (op === "select" && table === "clinics" && s.clinicError)
+        return { data: null, error: { code: "XX000" } };
+      if (op === "select" && table === "clinic_hours" && s.hoursThrow) throw new Error("boom");
       if (op === "select" && table === "clinics")
         return {
           data: { name: "Sample", timezone: "Asia/Manila", website_url: s.websiteUrl ?? null },
@@ -135,6 +140,19 @@ describe("acceptOffer", () => {
     expect(await acceptOffer(f.svc, TOKEN, NOW)).toBe("taken");
     expect(has(f.calls, "appointments", "insert")).toBe(false);
     expect(has(f.calls, "agent_actions", "insert", { status: "failed" })).toBe(true);
+  });
+  it("returns closed without claiming when the clinic cannot be loaded", async () => {
+    const f = fake({ offer: offer(), clinicError: true });
+    expect(await acceptOffer(f.svc, TOKEN, NOW)).toBe("closed");
+    expect(has(f.calls, "slot_offers", "update")).toBe(false);
+    expect(has(f.calls, "appointments", "insert")).toBe(false);
+  });
+  it("releases the claim when a lookup throws after claiming", async () => {
+    const f = fake({ offer: offer(), hoursThrow: true });
+    expect(await acceptOffer(f.svc, TOKEN, NOW)).toBe("closed");
+    expect(has(f.calls, "slot_offers", "update", { status: "accepted" })).toBe(true);
+    expect(has(f.calls, "slot_offers", "update", { status: "expired" })).toBe(true);
+    expect(has(f.calls, "appointments", "insert")).toBe(false);
   });
   it("maps a database overlap to taken", async () => {
     const f = fake({ offer: offer(), insertError: { code: "23P01" } });

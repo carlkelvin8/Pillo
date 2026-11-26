@@ -29,6 +29,13 @@ export function Landing() {
         <style>{`.story-scene{--p:1}.story-track{height:auto!important}.story-stage{position:relative;height:auto;min-height:100svh;padding-block:5rem}.story-hero-content{opacity:1!important;transform:none!important;filter:none!important}`}</style>
       </noscript>
 
+      <a
+        href="#main"
+        className="bg-ink text-surface focus-visible:ring-mint-strong sr-only z-[70] inline-flex min-h-11 items-center rounded-control px-4 font-semibold focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus-visible:ring-2"
+      >
+        Skip to content
+      </a>
+
       <header className="fixed inset-x-3 top-4 z-50 mx-auto flex max-w-6xl items-center justify-between gap-3 rounded-full border border-line bg-surface/80 py-1.5 pr-1.5 pl-4 backdrop-blur-md sm:inset-x-6">
         <Link
           href="/"
@@ -57,7 +64,7 @@ export function Landing() {
         ))}
       </nav>
 
-      <main>
+      <main id="main">
         <HeroScene />
         <MarqueeBands />
         <ChairScene />
@@ -69,9 +76,7 @@ export function Landing() {
       </main>
 
       <footer className="bg-ink text-faint border-t border-ink-2 px-6 py-8 text-center text-sm">
-        <p>
-          © {new Date().getFullYear()} {APP_NAME}
-        </p>
+        <p>© {APP_NAME}</p>
       </footer>
     </StoryRoot>
   );

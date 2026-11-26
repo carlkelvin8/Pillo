@@ -8,12 +8,14 @@
  *  - reuses the owner's existing clinic, or creates "QA Dental Clinic" through create_clinic(),
  *  - adds the receptionist and doctor memberships and a doctor profile.
  *
- * The shared password lives in .env.local as QA_SEED_PASSWORD (gitignored). It is generated on the
- * first run and never printed. Never run this against a production project.
+ * The shared password lives in .env.local as QA_SEED_PASSWORD (gitignored, written with mode 0600). It is
+ * generated on the first run and never printed. Never run this against a production project: the script
+ * only accepts a local Supabase URL (localhost, 127.0.0.1, [::1]) unless QA_SEED_ALLOW_HOST is set to
+ * exactly the URL's host (e.g. QA_SEED_ALLOW_HOST=abcd.supabase.co) for a dedicated QA project.
  * For sample appointments/invoices, run scripts/seed-qa-dashboard-trends.sql afterwards.
  */
 import { randomBytes } from "node:crypto";
-import { appendFileSync, existsSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 
 const ENV_FILE = ".env.local";
@@ -34,10 +36,31 @@ if (!process.argv.includes("--yes")) {
 if (process.env.NODE_ENV === "production") fail("refusing to run with NODE_ENV=production.");
 if (!url || !anonKey || !serviceKey) fail("missing Supabase variables in .env.local.");
 
+let parsedUrl: URL;
+try {
+  parsedUrl = new URL(url);
+} catch {
+  fail("NEXT_PUBLIC_SUPABASE_URL is not a valid URL.");
+}
+const LOCAL_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
+if (!LOCAL_HOSTS.includes(parsedUrl.hostname) && process.env.QA_SEED_ALLOW_HOST !== parsedUrl.host) {
+  fail(
+    `refusing to seed ${parsedUrl.host}: it is not a local Supabase. If it is a dedicated QA project, ` +
+      `set QA_SEED_ALLOW_HOST to exactly "${parsedUrl.host}" and re-run.`,
+  );
+}
+
 let password = process.env.QA_SEED_PASSWORD;
 if (!password) {
   password = randomBytes(12).toString("base64url");
-  appendFileSync(ENV_FILE, `\n# QA seeder login password (scripts/seed-qa.ts)\nQA_SEED_PASSWORD=${password}\n`);
+  const emptyLine = /^QA_SEED_PASSWORD=\s*$/m;
+  const existing = existsSync(ENV_FILE) ? readFileSync(ENV_FILE, "utf8") : null;
+  if (existing !== null && emptyLine.test(existing)) {
+    writeFileSync(ENV_FILE, existing.replace(emptyLine, () => `QA_SEED_PASSWORD=${password}`), { mode: 0o600 });
+  } else {
+    appendFileSync(ENV_FILE, `\n# QA seeder login password (scripts/seed-qa.ts)\nQA_SEED_PASSWORD=${password}\n`, { mode: 0o600 });
+  }
+  chmodSync(ENV_FILE, 0o600);
   console.log(`Generated a QA password and saved it as QA_SEED_PASSWORD in ${ENV_FILE}.`);
 }
 

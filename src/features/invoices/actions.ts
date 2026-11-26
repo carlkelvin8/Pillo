@@ -379,15 +379,27 @@ export async function recordPaymentAction(
     };
   }
   const supabase = await createClient();
-  const { data: inv } = await supabase
-    .from("invoices")
-    .select("status")
-    .eq("id", parsed.data.invoiceId)
-    .eq("clinic_id", c.clinic.id)
-    .maybeSingle();
-  const status = (inv as { status: string } | null)?.status;
-  if (!status || status === "void" || status === "paid")
+  const detail = await getInvoice(c.clinic.id, parsed.data.invoiceId);
+  const status = detail?.invoice.status;
+  if (!detail || !status || status === "void" || status === "paid")
     return { message: "This invoice cannot take a payment." };
+  const echoed = echo(formData, ["amount", "reference", "receivedOn", "method"]);
+  // Only succeeded payments count; pending links are not money received.
+  const stillDue = detail.invoice.total_centavos - amountPaid(detail.payments);
+  if (parsed.data.amount > stillDue) {
+    return {
+      message: "Please check the highlighted fields.",
+      fieldErrors: { amount: ["Amount is more than what is still due."] },
+      values: echoed,
+    };
+  }
+  if (parsed.data.receivedOn && parsed.data.receivedOn < detail.invoice.issued_on) {
+    return {
+      message: "Please check the highlighted fields.",
+      fieldErrors: { receivedOn: ["The date cannot be before the invoice date."] },
+      values: echoed,
+    };
+  }
   if (status === "draft") {
     const { error } = await supabase
       .from("invoices")
@@ -398,12 +410,13 @@ export async function recordPaymentAction(
   }
   if (!onlinePaymentsEnabled()) {
     // Online links are switched off, so an old pending link only blocks logging what was received.
-    await supabase
+    const { error: cancelError } = await supabase
       .from("payments")
       .update({ status: "cancelled" })
       .eq("invoice_id", parsed.data.invoiceId)
       .eq("clinic_id", c.clinic.id)
       .eq("status", "pending");
+    if (cancelError) return { message: "We could not clear the open payment link. Nothing was recorded.", values: echoed };
   }
   const { error } = await supabase.from("payments").insert({
     clinic_id: c.clinic.id,

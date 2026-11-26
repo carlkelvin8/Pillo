@@ -83,4 +83,48 @@ describe("GET /api/geocoding/search", () => {
     expect(second.status).toBe(200);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+
+  it("returns 502 on a provider timeout and passes an abort signal", async () => {
+    vi.mocked(fetch).mockRejectedValue(new DOMException("timeout", "TimeoutError"));
+    const response = await GET(
+      new Request("http://localhost/api/geocoding/search?q=Timeout%20place"),
+    );
+    expect(response.status).toBe(502);
+    expect(vi.mocked(fetch).mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+  });
+
+  it("returns 502 for an invalid body and does not cache it", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ error: "nope" }), { status: 200 }),
+    );
+    const first = await GET(new Request("http://localhost/api/geocoding/search?q=Bad%20body"));
+    expect(first.status).toBe(502);
+    testNow += 2000;
+    vi.mocked(Date.now).mockReturnValue(testNow);
+    vi.mocked(fetch).mockResolvedValue(new Response("[]", { status: 200 }));
+    const second = await GET(new Request("http://localhost/api/geocoding/search?q=Bad%20body"));
+    expect(second.status).toBe(200);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns only whitelisted fields and at most five places", async () => {
+    const place = (n: number) => ({
+      lat: "14.6",
+      lon: "121.0",
+      display_name: `P${n}`,
+      osm_id: n,
+      address: { house_number: "1" },
+    });
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(Array.from({ length: 8 }, (_, i) => place(i))), { status: 200 }),
+    );
+    const response = await GET(
+      new Request("http://localhost/api/geocoding/search?q=Many%20places"),
+    );
+    const body = await response.json();
+    expect(body).toHaveLength(5);
+    expect(body[0]).toEqual({ lat: "14.6", lon: "121.0", display_name: "P0" });
+  });
 });

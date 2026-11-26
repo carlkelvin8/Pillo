@@ -3,7 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { StoryCursor } from "./cursor";
 import { StoryMascot } from "./mascot";
-import { clamp, hasFinePointer, prefersReducedMotion, story, subscribeFrame } from "./store";
+import { clamp, COMPACT_QUERY, hasFinePointer, motionSupported, story, subscribeFrame } from "./store";
 
 type SceneBox = { el: HTMLElement; top: number; height: number };
 
@@ -21,8 +21,7 @@ export function StoryRoot({ children }: { children: ReactNode }) {
     const el = root.current;
     if (!el) return;
     // Old browsers and test environments without these APIs get the plain page.
-    const supported = typeof IntersectionObserver !== "undefined" && typeof ResizeObserver !== "undefined";
-    if (!supported || prefersReducedMotion()) {
+    if (!motionSupported()) {
       el.dataset.motion = "reduced";
       return;
     }
@@ -59,12 +58,34 @@ export function StoryRoot({ children }: { children: ReactNode }) {
     );
     for (const node of el.querySelectorAll("[data-reveal]")) reveal.observe(node);
 
+    // On short screens only the hero keeps scrubbing; other scenes show their finished state (see story.css).
+    const compactQuery = typeof window.matchMedia === "function" ? window.matchMedia(COMPACT_QUERY) : null;
+    let compact = compactQuery?.matches ?? false;
+    const applyCompact = () => {
+      if (compact) el.dataset.compact = "true";
+      else delete el.dataset.compact;
+      if (compact) {
+        for (const scene of scenes) {
+          if (scene.el.dataset.scene === "hero") continue;
+          scene.el.style.removeProperty("--p");
+          scene.el.style.removeProperty("--in");
+        }
+      }
+    };
+    const onCompactChange = () => {
+      compact = compactQuery?.matches ?? false;
+      applyCompact();
+    };
+    applyCompact();
+    compactQuery?.addEventListener("change", onCompactChange);
+
     let active = "";
     const unsubscribe = subscribeFrame((state) => {
       el.style.setProperty("--scroll", state.scroll.toFixed(4));
       el.style.setProperty("--vy", state.vy.toFixed(2));
       let chapter = "hero";
       scenes.forEach((scene) => {
+        if (compact && scene.el.dataset.scene !== "hero") return;
         const travel = Math.max(1, scene.height - state.vh);
         const p = clamp((state.y - scene.top) / travel);
         const entering = clamp((state.y + state.vh - scene.top) / state.vh);
@@ -124,6 +145,7 @@ export function StoryRoot({ children }: { children: ReactNode }) {
 
     return () => {
       unsubscribe();
+      compactQuery?.removeEventListener("change", onCompactChange);
       reveal.disconnect();
       resizeObserver.disconnect();
       window.removeEventListener("load", measureScenes);
@@ -131,6 +153,11 @@ export function StoryRoot({ children }: { children: ReactNode }) {
       el.classList.remove("story-js", "story-cursor-on");
       delete el.dataset.motion;
       delete el.dataset.active;
+      delete el.dataset.compact;
+      for (const scene of scenes) {
+        scene.el.style.removeProperty("--p");
+        scene.el.style.removeProperty("--in");
+      }
     };
   }, []);
 

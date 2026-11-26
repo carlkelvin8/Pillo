@@ -65,6 +65,9 @@ export function blockPosition(appointment: AppointmentTimes, tz: string, grid: C
   return { top, height };
 }
 
+// A block is drawn at least BLOCK_MIN_PX tall; at the booked-hour density that is this many minutes.
+const BLOCK_MIN_MINUTES = Math.ceil((BLOCK_MIN_PX / BOOKED_HOUR_PX) * 60);
+
 export type Laned<T> = T & { lane: number; lanes: number };
 
 /**
@@ -79,8 +82,8 @@ export function assignLanes<T extends { startsAt: string; endsAt: string }>(
   );
   const result: Laned<T>[] = [];
   let cluster: { item: T; lane: number }[] = [];
-  let clusterEnd = "";
-  const laneEnds: string[] = [];
+  let clusterEnd = 0;
+  const laneEnds: number[] = [];
 
   const flush = () => {
     const lanes = Math.max(laneEnds.length, 1);
@@ -90,13 +93,15 @@ export function assignLanes<T extends { startsAt: string; endsAt: string }>(
   };
 
   for (const item of sorted) {
-    if (cluster.length > 0 && item.startsAt >= clusterEnd) flush();
-    let lane = laneEnds.findIndex((end) => end <= item.startsAt);
+    const start = new Date(item.startsAt).getTime();
+    // Occupancy uses the rendered height, which is never below the minimum block size.
+    const end = Math.max(new Date(item.endsAt).getTime(), start + BLOCK_MIN_MINUTES * 60_000);
+    if (cluster.length > 0 && start >= clusterEnd) flush();
+    let lane = laneEnds.findIndex((laneEnd) => laneEnd <= start);
     if (lane === -1) lane = laneEnds.length;
-    laneEnds[lane] = item.endsAt;
+    laneEnds[lane] = end;
     cluster.push({ item, lane });
-    if (item.endsAt > clusterEnd || cluster.length === 1)
-      clusterEnd = item.endsAt > clusterEnd ? item.endsAt : clusterEnd;
+    clusterEnd = Math.max(clusterEnd, end);
   }
   flush();
   return result;

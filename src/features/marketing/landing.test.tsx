@@ -43,4 +43,14 @@ describe("Landing", () => {
     expect(samples.length).toBeGreaterThanOrEqual(3);
     expect(container.textContent).toContain("[YOUR PRICE]");
   });
+
+  it("starts with a skip link to the main landmark and keeps phone lists in the page", () => {
+    const { container } = render(<Landing />);
+    const skip = screen.getByRole("link", { name: "Skip to content" });
+    expect(skip).toHaveAttribute("href", "#main");
+    expect(container.querySelector("main")).toHaveAttribute("id", "main");
+    expect(container.querySelector("a")).toBe(skip);
+    expect(screen.getByText("A cancellation comes in")).toBeInTheDocument();
+    expect(screen.getByText(/Never gives medical advice/)).toBeInTheDocument();
+  });
 });

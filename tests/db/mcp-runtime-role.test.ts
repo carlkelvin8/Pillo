@@ -101,6 +101,15 @@ describe("pillo_mcp role: allowed statements (everything src/features/mcp issues
     ).rejects.toMatchObject({ code: "42501" });
   });
 
+  it("cannot select other agent_actions columns such as payload", async () => {
+    await expect(
+      asMcpRuntime((tx) => tx`select payload from public.agent_actions where clinic_id = ${clinic}`, { clinicId: clinic }),
+    ).rejects.toMatchObject({ code: "42501" });
+    await expect(
+      asMcpRuntime((tx) => tx`select * from public.agent_actions where clinic_id = ${clinic}`, { clinicId: clinic }),
+    ).rejects.toMatchObject({ code: "42501" });
+  });
+
   it("cannot read appointment reason", async () => {
     await expect(
       asMcpRuntime((tx) => tx`select reason from public.appointments where clinic_id = ${clinic}`, { clinicId: clinic }),

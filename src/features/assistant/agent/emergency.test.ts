@@ -12,6 +12,11 @@ describe("detectEmergency", () => {
     "gusto kong mamatay",
     "this is an EMERGENCY",
     "dumudugo siya at hindi humihinto",
+    "I want to die",
+    "i wanna die",
+    "bleeding will not stop",
+    "the bleeding won't stop",
+    "bleeding and it can't stop",
   ])("flags %j", (text) => {
     expect(detectEmergency(text)).toBe(true);
   });
@@ -21,6 +26,8 @@ describe("detectEmergency", () => {
     "Can I book on Friday at 3pm?",
     "Open po ba kayo bukas?",
     "I want to reschedule",
+    "I want to diet before my braces",
+    "bleeding gums, not sure when to stop brushing",
     "",
   ])("does not flag %j", (text) => {
     expect(detectEmergency(text)).toBe(false);

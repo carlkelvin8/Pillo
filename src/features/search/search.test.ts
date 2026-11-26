@@ -8,8 +8,13 @@ describe("searchQuerySchema", () => {
     expect(searchQuerySchema.safeParse(" ").success).toBe(false);
     expect(searchQuerySchema.parse("  Ana  ")).toBe("Ana");
   });
+  it("keeps apostrophes and colons in names", () => {
+    expect(searchQuerySchema.parse("O'Brien")).toBe("O'Brien");
+    expect(searchQuerySchema.parse("Ana: Cruz")).toBe("Ana: Cruz");
+  });
   it("strips filter and wildcard characters", () => {
     expect(searchQuerySchema.parse("a%,b_(c)")).toBe("a b c");
+    expect(searchQuerySchema.parse('a\\b*"c')).toBe("a b c");
     expect(searchQuerySchema.safeParse("x".repeat(61)).success).toBe(false);
   });
 });

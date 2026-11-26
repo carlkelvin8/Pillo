@@ -19,7 +19,7 @@ export function LedgerScene() {
           <MascotSpot
             mood="wink"
             rotate={10}
-            className="absolute -bottom-9 -left-3 z-10 w-14 sm:-bottom-10 sm:-left-8 sm:w-24"
+            className="absolute -bottom-9 -left-3 z-10 w-14 sm:-bottom-16 sm:-left-12 sm:w-24"
           />
           <div className="story-card" data-tilt="">
             <div className="flex items-center justify-between gap-3 pb-3">

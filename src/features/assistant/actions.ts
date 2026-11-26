@@ -102,7 +102,7 @@ export async function sendStaffMessageAction(
   });
   if (error)
     return { message: "We could not send that reply.", values: echo(formData, ["message"]) };
-  await Promise.all([
+  const [takeover] = await Promise.all([
     supabase
       .from("conversations")
       .update({ handled_by: "human", status: "open" })
@@ -110,6 +110,13 @@ export async function sendStaffMessageAction(
       .eq("clinic_id", c.clinic.id),
     logAudit(supabase, c.clinic.id, "conversation.replied", "conversation", conversationId),
   ]);
+  if (takeover.error) {
+    // The message is already stored; show it and let the sender retry the takeover.
+    revalidatePath("/dr-pill");
+    return {
+      message: "Your reply was sent but we could not take over the chat. Please try again.",
+    };
+  }
   revalidatePath("/dr-pill");
   return { ok: true };
 }
