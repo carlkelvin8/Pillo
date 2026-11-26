@@ -396,6 +396,25 @@ describe("invoice lifecycle and access", () => {
     );
     expect(err.message).toMatch(/cannot be voided/);
   });
+
+  it("voiding a sent invoice cancels its open payment links", async () => {
+    const id = await makeInvoice(u.billingA, { send: true });
+    const ref = "link_" + Math.random().toString(36).slice(2, 12);
+    await asUserCommitted(
+      u.billingA,
+      (tx) =>
+        tx`insert into public.payments (clinic_id, invoice_id, amount_centavos, status, provider, provider_ref, checkout_url) values (${clinicA}, ${id}, 150000, 'pending', 'paymongo', ${ref}, 'https://pm.test/x')`,
+    );
+    await asUserCommitted(
+      u.billingA,
+      (tx) => tx`update public.invoices set status = 'void' where id = ${id}`,
+    );
+    expect((await totals(id))?.status).toBe("void");
+    const [p] = await admin<
+      { status: string }[]
+    >`select status from public.payments where provider_ref = ${ref}`;
+    expect(p?.status).toBe("cancelled");
+  });
 });
 
 describe("payments", () => {
@@ -543,6 +562,35 @@ describe("provider webhook (apply_provider_payment)", () => {
     expect(((await applyEvent(eid(), "link_nope", 100))[0] as unknown as { r: string }).r).toBe(
       "unknown_reference",
     );
+  });
+
+  it("does not apply a payment to a voided invoice and flags it for review", async () => {
+    const { id, ref } = await pendingLink();
+    await asUserCommitted(
+      u.recepA,
+      (tx) => tx`update public.invoices set status = 'void' where id = ${id}`,
+    );
+    expect(((await applyEvent(eid(), ref, 150000))[0] as unknown as { r: string }).r).toBe(
+      "not_pending",
+    );
+    expect((await totals(id))?.status).toBe("void");
+    const [p] = await admin<
+      { status: string }[]
+    >`select status from public.payments where provider_ref = ${ref}`;
+    expect(p?.status).toBe("cancelled");
+  });
+
+  it("does not apply a payment to a link staff already cancelled", async () => {
+    const { id, ref } = await pendingLink();
+    await asUserCommitted(
+      u.recepA,
+      (tx) =>
+        tx`update public.payments set status = 'cancelled' where provider_ref = ${ref} and status = 'pending'`,
+    );
+    expect(((await applyEvent(eid(), ref, 150000))[0] as unknown as { r: string }).r).toBe(
+      "not_pending",
+    );
+    expect((await totals(id))?.status).toBe("sent");
   });
 
   it("is callable only by the service role", async () => {

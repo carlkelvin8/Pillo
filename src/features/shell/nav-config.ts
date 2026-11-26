@@ -52,6 +52,11 @@ const NAV: NavGroup[] = [
         icon: Plug,
         capability: "integrations.manage",
       },
+    ],
+  },
+  {
+    label: "Settings",
+    items: [
       {
         href: "/settings/clinic",
         label: "Settings",

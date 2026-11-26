@@ -1,8 +1,25 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { AppShellFrame } from "./app-shell-frame";
 
 describe("AppShellFrame", () => {
+  beforeEach(() => window.localStorage.clear());
+
+  it("remembers the compact sidebar after a reload", () => {
+    const frame = (
+      <AppShellFrame role="owner" sidebarHeader={<span>Pillo</span>} sidebarBody={<span>Nav</span>}>
+        <h1>Page</h1>
+      </AppShellFrame>
+    );
+    const first = render(frame);
+    fireEvent.click(screen.getByRole("button", { name: "Toggle sidebar width" }));
+    expect(window.localStorage.getItem("pillo.sidebar")).toBe("compact");
+    first.unmount();
+
+    render(frame);
+    expect(screen.getByTestId("app-shell")).toHaveAttribute("data-sidebar-collapsed", "true");
+  });
+
   it("toggles the desktop sidebar between full and compact widths accessibly", () => {
     render(
       <AppShellFrame

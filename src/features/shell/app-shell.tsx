@@ -16,7 +16,7 @@ type AppShellProps = {
   children: ReactNode;
 };
 
-/** 256px sidebar + top bar (search, notifications) + page content. */
+/** Sidebar (240-272px, collapsible to 72px) + top bar (search, notifications) + page content. */
 export function AppShell({ user, role, clinicName, children }: AppShellProps) {
   const groups = navForRole(role);
   const sidebarHeader = (

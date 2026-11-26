@@ -125,6 +125,8 @@ pnpm test      # unit (vitest, jsdom)
 pnpm test:db   # RLS tests on a throwaway local Postgres (needs postgres/initdb on PATH; no Docker)
 ```
 
+**QA login accounts:** run `pnpm seed:qa --yes` (idempotent, dev/QA project only). It creates or repairs `qa.owner1@`, `qa.recep1@`, `qa.doc1@example.com` (owner, receptionist, doctor) and a QA clinic. The shared password is `QA_SEED_PASSWORD` in the gitignored `.env.local`. Never ask the user for it or create new test accounts: re-run the seeder. Sample data: `scripts/seed-qa-dashboard-trends.sql`.
+
 `tests/db/supabase-stub.sql` stands in for Supabase's `auth` schema and roles. Once Docker/Supabase local runs, also run the migrations there (`supabase db reset`).
 
 ## Rules

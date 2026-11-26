@@ -85,7 +85,7 @@ export default async function InboxPage({ searchParams }: Props) {
       <DrPillTabs active="conversations" isOwner={can(membership.role, "staff.manage")} />
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
-        <Card className="flex flex-col gap-3 p-3">
+        <Card className="flex h-[min(76vh,52rem)] min-h-[36rem] flex-col gap-3 p-3">
           <div className="flex gap-1.5 px-1 pt-1">
             <Link
               href={href(selectedId, "all")}

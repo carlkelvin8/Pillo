@@ -48,7 +48,8 @@
   --text-card-title--font-weight: 600;
 
   /* Layout */
-  --spacing-sidebar: 17rem;
+  /* 240px on small laptops, up to 272px on wide screens. */
+  --spacing-sidebar: clamp(15rem, 15vw, 17rem);
   --spacing-page: clamp(1.5rem, 3vw, 3rem);
 }
 
@@ -62,11 +63,18 @@
 }
 
 .app-shell[data-sidebar-collapsed="true"] .sidebar-brand-link > span > span:last-child,
-.app-shell[data-sidebar-collapsed="true"] .sidebar-clinic-context,
+.app-shell[data-sidebar-collapsed="true"] .sidebar-clinic-copy,
 .app-shell[data-sidebar-collapsed="true"] .sidebar-group-label,
 .app-shell[data-sidebar-collapsed="true"] .sidebar-nav-label,
 .app-shell[data-sidebar-collapsed="true"] .sidebar-user-copy {
   display: none;
+}
+
+.app-shell[data-sidebar-collapsed="true"] .sidebar-clinic-context {
+  justify-content: center;
+  padding: 0.25rem;
+  border-color: transparent;
+  background: transparent;
 }
 
 .app-shell[data-sidebar-collapsed="true"] .sidebar-nav {

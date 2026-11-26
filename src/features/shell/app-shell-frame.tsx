@@ -1,10 +1,12 @@
 "use client";
 
 import { Bell, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Role } from "@/features/auth/permissions";
 import { DrPillCompanion } from "./dr-pill-companion";
 import { MobileNav } from "./mobile-nav";
+
+const SIDEBAR_KEY = "pillo.sidebar";
 
 export function AppShellFrame({
   role,
@@ -19,6 +21,25 @@ export function AppShellFrame({
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
+  // Remember the choice across reloads. Read after mount so server and client markup match.
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(SIDEBAR_KEY) === "compact") setCollapsed(true);
+    } catch {
+      /* storage can be unavailable (private mode); the sidebar just starts expanded */
+    }
+  }, []);
+  const toggle = () =>
+    setCollapsed((value) => {
+      const next = !value;
+      try {
+        window.localStorage.setItem(SIDEBAR_KEY, next ? "compact" : "full");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+
   return (
     <div
       className="app-shell bg-canvas flex min-h-screen"
@@ -28,7 +49,7 @@ export function AppShellFrame({
       <aside
         id="app-sidebar"
         aria-label="Primary sidebar"
-        className="app-sidebar w-sidebar border-line bg-surface sticky top-0 hidden h-screen shrink-0 flex-col gap-7 self-start overflow-y-auto border-r px-5 py-5 transition-[width,flex-basis,padding] duration-200 motion-reduce:transition-none lg:flex"
+        className="app-sidebar w-sidebar border-line bg-surface sticky top-0 hidden h-screen shrink-0 flex-col gap-6 self-start overflow-y-auto border-r px-4 py-5 transition-[width,flex-basis,padding] duration-200 motion-reduce:transition-none lg:flex"
         style={collapsed ? { width: "4.5rem", flexBasis: "4.5rem" } : undefined}
       >
         {sidebarHeader}
@@ -51,7 +72,7 @@ export function AppShellFrame({
                 aria-controls="app-sidebar"
                 aria-expanded={!collapsed}
                 title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-                onClick={() => setCollapsed((value) => !value)}
+                onClick={toggle}
                 className="rounded-control border-line bg-surface text-ink hover:bg-subtle focus-visible:outline-ink hidden size-11 shrink-0 items-center justify-center border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 lg:inline-flex"
               >
                 {collapsed ? (
