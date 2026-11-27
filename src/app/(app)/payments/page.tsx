@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
@@ -39,7 +40,8 @@ export default async function PaymentsPage({ searchParams }: Props) {
   const { membership } = await requireCapability("payments.manage");
   const params = await searchParams;
   const filter: Filter = FILTERS.find((f) => f.key === params.filter)?.key ?? "all";
-  const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
+  // Capped so a huge ?page= cannot produce an absurd range; the last-page redirect below still applies.
+  const page = Math.min(100_000, Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1));
   const clinicId = membership.clinic.id;
   const tz = membership.clinic.timezone;
   const today = todayIn(tz);
@@ -66,6 +68,8 @@ export default async function PaymentsPage({ searchParams }: Props) {
     if (p > 1) query.set("page", String(p));
     return query.size ? `/payments?${query}` : "/payments";
   };
+
+  if (page > pages) redirect(href(filter, pages));
 
   return (
     <>
@@ -154,9 +158,9 @@ export default async function PaymentsPage({ searchParams }: Props) {
                   {t.invoiceId ? (
                     <Link
                       href={`/invoices/${t.invoiceId}`}
-                      className="font-semibold wrap-anywhere hover:underline"
+                      className="inline-flex min-h-11 max-w-full items-center font-semibold hover:underline"
                     >
-                      {t.title}
+                      <span className="min-w-0 wrap-anywhere">{t.title}</span>
                     </Link>
                   ) : (
                     <p className="font-semibold">{t.title}</p>

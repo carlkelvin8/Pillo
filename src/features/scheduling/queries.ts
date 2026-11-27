@@ -26,7 +26,7 @@ export async function listBranches(clinicId: string): Promise<Branch[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("branches")
-    .select("id, name, address, phone, latitude, longitude")
+    .select("id, name, address, phone, latitude, longitude, hours_saved_at")
     .eq("clinic_id", clinicId)
     .order("created_at", { ascending: true });
   check(error, "branches");
@@ -131,7 +131,10 @@ export async function monthlyAppointmentCounts(
   return countAppointmentStartsByMonth(startsAt, timezone);
 }
 
-export async function listWaitlist(clinicId: string): Promise<WaitlistRow[]> {
+/** A waiting entry plus whether the patient has recorded contact consent (offers need both). */
+export type WaitlistEntry = WaitlistRow & { consented: boolean };
+
+export async function listWaitlist(clinicId: string): Promise<WaitlistEntry[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("waitlist_entries")
@@ -142,7 +145,18 @@ export async function listWaitlist(clinicId: string): Promise<WaitlistRow[]> {
     .in("status", ["waiting", "offered"])
     .order("created_at", { ascending: true });
   check(error, "waitlist");
-  return z.array(waitlistRowSchema).parse(data ?? []);
+  const rows = z.array(waitlistRowSchema).parse(data ?? []);
+  if (rows.length === 0) return [];
+  const { data: patients, error: patientError } = await supabase
+    .from("patients")
+    .select("id, consent_at")
+    .eq("clinic_id", clinicId)
+    .in("id", [...new Set(rows.map((row) => row.patient_id))]);
+  check(patientError, "waitlist consent");
+  const consented = new Set(
+    (patients ?? []).filter((patient) => patient.consent_at !== null).map((patient) => patient.id),
+  );
+  return rows.map((row) => ({ ...row, consented: consented.has(row.patient_id) }));
 }
 
 /** Everything generateSlots needs for one doctor, branch and clinic-local day. */

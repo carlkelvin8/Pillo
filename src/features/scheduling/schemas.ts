@@ -22,7 +22,7 @@ const optionalText = (max: number) =>
   z
     .string()
     .trim()
-    .max(max)
+    .max(max, `Keep this to ${max} characters or fewer.`)
     .transform((v) => (v === "" ? undefined : v))
     .optional();
 
@@ -73,6 +73,8 @@ export const branchRowSchema = z.object({
   phone: z.string().nullable(),
   latitude: z.number().nullable(),
   longitude: z.number().nullable(),
+  /** Set when the owner saved the weekly hours (even all closed), so the editor stops suggesting hours. */
+  hours_saved_at: z.string().nullable().optional(),
 });
 export type Branch = z.infer<typeof branchRowSchema>;
 

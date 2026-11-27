@@ -36,17 +36,50 @@ export async function listInvoices(args: {
   if (args.filter === "overdue") q = q.eq("status", "sent").lt("due_on", args.today);
   if (args.filter === "paid") q = q.eq("status", "paid");
   const { data, count, error } = await q;
+  if (error?.code === "PGRST103") {
+    // Page is past the last row: report the total so the page can clamp to the last page.
+    let c = supabase
+      .from("invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("clinic_id", args.clinicId);
+    if (args.filter === "open") c = c.eq("status", "sent");
+    if (args.filter === "overdue") c = c.eq("status", "sent").lt("due_on", args.today);
+    if (args.filter === "paid") c = c.eq("status", "paid");
+    const counted = await c;
+    check(counted.error, "invoices");
+    return { rows: [], total: counted.count ?? 0 };
+  }
   check(error, "invoices");
   return { rows: z.array(invoiceRowSchema).parse(data ?? []), total: count ?? 0 };
 }
 
-/** Open (sent, unpaid), overdue and paid-this-month totals. */
+/** What is still owed per open invoice: the total minus succeeded payments, never below zero. */
+export function summarizeOpen(
+  invoices: { id: string; total_centavos: number; due_on: string }[],
+  paidByInvoice: Map<string, number>,
+  today: string,
+) {
+  const due = invoices
+    .map((i) => ({
+      due_on: i.due_on,
+      centavos: Math.max(0, i.total_centavos - (paidByInvoice.get(i.id) ?? 0)),
+    }))
+    .filter((i) => i.centavos > 0);
+  const sum = (rows: { centavos: number }[]) => rows.reduce((a, r) => a + r.centavos, 0);
+  const overdue = due.filter((r) => r.due_on < today);
+  return {
+    open: { centavos: sum(due), count: due.length },
+    overdue: { centavos: sum(overdue), count: overdue.length },
+  };
+}
+
+/** Open (sent, still owing) and overdue amounts due, plus paid-this-month totals. */
 export async function invoiceStats(clinicId: string, today: string, monthStartIso: string) {
   const supabase = await createClient();
   const [open, paid] = await Promise.all([
     supabase
       .from("invoices")
-      .select("total_centavos, due_on")
+      .select("id, total_centavos, due_on")
       .eq("clinic_id", clinicId)
       .eq("status", "sent"),
     supabase
@@ -59,16 +92,34 @@ export async function invoiceStats(clinicId: string, today: string, monthStartIs
   check(open.error, "invoice totals");
   check(paid.error, "invoice totals");
   const openRows = z
-    .array(z.object({ total_centavos: z.coerce.number(), due_on: z.string() }))
+    .array(z.object({ id: z.uuid(), total_centavos: z.coerce.number(), due_on: z.string() }))
     .parse(open.data ?? []);
   const paidRows = z.array(z.object({ total_centavos: z.coerce.number() })).parse(paid.data ?? []);
-  const overdue = openRows.filter((r) => r.due_on < today);
-  const sum = (rows: { total_centavos: number }[]) =>
-    rows.reduce((a, r) => a + r.total_centavos, 0);
+
+  // Partly paid invoices stay "sent": count only what is still owed, matching the invoice page.
+  const paidByInvoice = new Map<string, number>();
+  const ids = openRows.map((r) => r.id);
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data, error } = await supabase
+      .from("payments")
+      .select("invoice_id, amount_centavos")
+      .eq("clinic_id", clinicId)
+      .eq("status", "succeeded")
+      .in("invoice_id", ids.slice(i, i + 100));
+    check(error, "invoice payments");
+    for (const p of z
+      .array(z.object({ invoice_id: z.uuid(), amount_centavos: z.coerce.number() }))
+      .parse(data ?? []))
+      paidByInvoice.set(p.invoice_id, (paidByInvoice.get(p.invoice_id) ?? 0) + p.amount_centavos);
+  }
+  const { open: openTotals, overdue } = summarizeOpen(openRows, paidByInvoice, today);
   return {
-    open: { centavos: sum(openRows), count: openRows.length },
-    overdue: { centavos: sum(overdue), count: overdue.length },
-    paidThisMonth: { centavos: sum(paidRows), count: paidRows.length },
+    open: openTotals,
+    overdue,
+    paidThisMonth: {
+      centavos: paidRows.reduce((a, r) => a + r.total_centavos, 0),
+      count: paidRows.length,
+    },
   };
 }
 

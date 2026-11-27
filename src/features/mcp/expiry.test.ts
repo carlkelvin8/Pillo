@@ -10,8 +10,14 @@ describe("MCP token expiry", () => {
     expect(expiryFromChoice(30, now).toISOString()).toBe("2026-12-26T00:00:00.000Z");
   });
   it("classifies tokens as active, expired or revoked", () => {
-    expect(tokenState({ revoked_at: null, expires_at: "2026-12-01T00:00:00Z" }, now)).toBe("active");
-    expect(tokenState({ revoked_at: null, expires_at: "2026-11-25T00:00:00Z" }, now)).toBe("expired");
-    expect(tokenState({ revoked_at: "2026-11-01T00:00:00Z", expires_at: "2027-01-01T00:00:00Z" }, now)).toBe("revoked");
+    expect(tokenState({ revoked_at: null, expires_at: "2026-12-01T00:00:00Z" }, now)).toBe(
+      "active",
+    );
+    expect(tokenState({ revoked_at: null, expires_at: "2026-11-25T00:00:00Z" }, now)).toBe(
+      "expired",
+    );
+    expect(
+      tokenState({ revoked_at: "2026-11-01T00:00:00Z", expires_at: "2027-01-01T00:00:00Z" }, now),
+    ).toBe("revoked");
   });
 });

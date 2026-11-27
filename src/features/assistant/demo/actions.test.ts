@@ -8,7 +8,11 @@ const { getWorkspaceMock, runGeminiDemoMock } = vi.hoisted(() => ({
 vi.mock("@/features/auth/workspace", () => ({ getWorkspace: getWorkspaceMock }));
 vi.mock("./run", () => ({
   runGeminiDemo: runGeminiDemoMock,
-  SYNTHETIC_QUESTIONS: ["What are the clinic hours?", "Where is the clinic located?", "Which doctors work at the clinic?"],
+  SYNTHETIC_QUESTIONS: [
+    "What are the clinic hours?",
+    "Where is the clinic located?",
+    "Which doctors work at the clinic?",
+  ],
 }));
 
 import { runSyntheticDemoAction, synthesizeDemoVoiceAction } from "./actions";
@@ -48,7 +52,10 @@ describe("synthesizeDemoVoiceAction", () => {
   it("rejects client-supplied speech text instead of forwarding it to Gemini", async () => {
     env.NODE_ENV = "development";
 
-    const result = await synthesizeDemoVoiceAction({}, formWithLine("Patient Maria has an appointment"));
+    const result = await synthesizeDemoVoiceAction(
+      {},
+      formWithLine("Patient Maria has an appointment"),
+    );
 
     expect(result.message).toBe("Please check the highlighted fields.");
     expect(result.data).toBeUndefined();
@@ -92,7 +99,9 @@ describe("runSyntheticDemoAction", () => {
   it("returns a bounded-timeout message when Gemini does not respond", async () => {
     env.NODE_ENV = "development";
     env.GEMINI_API_KEY = "test-key";
-    runGeminiDemoMock.mockRejectedValueOnce(Object.assign(new Error("deadline expired"), { status: 504 }));
+    runGeminiDemoMock.mockRejectedValueOnce(
+      Object.assign(new Error("deadline expired"), { status: 504 }),
+    );
 
     const result = await runSyntheticDemoAction({}, formWithQuestion("What are the clinic hours?"));
 
@@ -102,7 +111,9 @@ describe("runSyntheticDemoAction", () => {
   it("recognizes the SDK connection-timeout error by its name", async () => {
     env.NODE_ENV = "development";
     env.GEMINI_API_KEY = "test-key";
-    runGeminiDemoMock.mockRejectedValueOnce(Object.assign(new Error("request timed out"), { name: "APIConnectionTimeoutError" }));
+    runGeminiDemoMock.mockRejectedValueOnce(
+      Object.assign(new Error("request timed out"), { name: "APIConnectionTimeoutError" }),
+    );
 
     const result = await runSyntheticDemoAction({}, formWithQuestion("What are the clinic hours?"));
 
@@ -112,7 +123,9 @@ describe("runSyntheticDemoAction", () => {
   it("explains when the Gemini Free Tier request quota has been reached", async () => {
     env.NODE_ENV = "development";
     env.GEMINI_API_KEY = "test-key";
-    runGeminiDemoMock.mockRejectedValueOnce(Object.assign(new Error("free tier quota reached"), { status: 429 }));
+    runGeminiDemoMock.mockRejectedValueOnce(
+      Object.assign(new Error("free tier quota reached"), { status: 429 }),
+    );
 
     const result = await runSyntheticDemoAction({}, formWithQuestion("What are the clinic hours?"));
 

@@ -1,3 +1,4 @@
+import { invoiceLabel } from "./totals";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 export type InvoicePdfData = {
@@ -19,8 +20,8 @@ export async function renderInvoicePdf(data: InvoicePdfData): Promise<Uint8Array
     y -= (opts.size ?? 11) + 12;
   };
   line(data.clinicName, { bold: true, size: 20 });
-  line(`Invoice #${data.invoiceNumber}`, { bold: true, size: 16 });
-  line(`Status: ${data.status}    Due: ${data.dueOn}`);
+  line(invoiceLabel(data.invoiceNumber), { bold: true, size: 16 });
+  line(`Status: ${data.status.charAt(0).toUpperCase()}${data.status.slice(1)}    Due: ${data.dueOn}`);
   y -= 8;
   line(`Patient: ${data.patientName}`, { bold: true });
   y -= 12;

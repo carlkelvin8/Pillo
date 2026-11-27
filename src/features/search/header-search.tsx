@@ -86,7 +86,7 @@ export function HeaderSearch({ className = "" }: HeaderSearchProps) {
         const next = event.relatedTarget as Node | null;
         if (next && !event.currentTarget.contains(next)) setOpen(false);
       }}
-      className={`relative min-w-0 max-w-90 flex-1 ${className}`}
+      className={`relative max-w-90 min-w-0 flex-1 ${className}`}
     >
       <div className="rounded-control border-line bg-surface focus-within:outline-ink flex min-h-11 items-center gap-2.5 border px-4 focus-within:outline-2 focus-within:outline-offset-2">
         <Search className="text-muted size-4 shrink-0" aria-hidden="true" />
@@ -102,10 +102,16 @@ export function HeaderSearch({ className = "" }: HeaderSearchProps) {
           placeholder="Search patients or INV number"
           value={query}
           onChange={(event) => {
-            setQuery(event.target.value);
+            const next = event.target.value;
+            setQuery(next);
+            setOpen(true);
+            // Same search (e.g. a trailing space): the fetch effect will not rerun, so keep results.
+            if (next.trim() === trimmed) return;
             setResults([]);
             setActive(-1);
-            setOpen(true);
+            setFailed(false);
+            // Show "Searching…" during the debounce instead of a false "No matches."
+            setLoading(next.trim().length >= 2);
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={(event) => {
@@ -127,7 +133,7 @@ export function HeaderSearch({ className = "" }: HeaderSearchProps) {
               }
             }
           }}
-          className="placeholder:text-muted w-full min-w-0 bg-transparent text-sm outline-none"
+          className="placeholder:text-muted min-h-11 w-full min-w-0 self-stretch bg-transparent text-sm outline-none"
         />
       </div>
       <p className="sr-only" role="status" aria-live="polite">
@@ -158,9 +164,7 @@ export function HeaderSearch({ className = "" }: HeaderSearchProps) {
               </li>
             ))}
           </ul>
-          {visible.length === 0 ? (
-            <p className="text-muted px-3 py-4 text-sm">{status}</p>
-          ) : null}
+          {visible.length === 0 ? <p className="text-muted px-3 py-4 text-sm">{status}</p> : null}
         </div>
       ) : null}
     </div>

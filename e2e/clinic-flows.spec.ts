@@ -16,6 +16,7 @@ test("flow 1: add a patient and book an appointment", async ({ page }) => {
   await dialog.getByLabel("Phone").fill("09171234567");
   await dialog.getByRole("button", { name: "Add patient" }).click();
   await expect(page).toHaveURL(/\/patients\/[0-9a-f-]{36}/);
+  const patientUrl = page.url();
   await expect(page.getByRole("heading", { name: patientName })).toBeVisible();
 
   await page.goto("/appointments");
@@ -23,13 +24,18 @@ test("flow 1: add a patient and book an appointment", async ({ page }) => {
   const booking = page.getByRole("dialog");
   await pickPatient(page, patientName);
   await expect(booking.getByText("Finding open times…")).toBeHidden({ timeout: 30_000 });
+  // Earlier runs fill the first open days, so book on the last offered date, which is free.
+  await booking.getByRole("group", { name: "Date" }).getByRole("button").last().click();
+  await expect(booking.getByText("Finding open times…")).toBeHidden({ timeout: 30_000 });
   const firstTime = booking.getByRole("group", { name: "Time" }).getByRole("button").first();
   await expect(firstTime, "needs an open slot: set branch hours and a doctor").toBeVisible();
   await firstTime.click();
   await booking.getByLabel("Reason").fill("E2E check-up");
   await booking.getByRole("button", { name: "Book appointment" }).click();
   await expect(booking).toBeHidden({ timeout: 30_000 });
-  await expect(page.getByText(patientName).first()).toBeVisible();
+  // The slot is on a later day than the calendar shows, so confirm it on the patient's record.
+  await page.goto(patientUrl);
+  await expect(page.getByText("E2E check-up").first()).toBeVisible();
 });
 
 test("flow 2: invoice, cash payment, paid and listed in payments", async ({ page }) => {

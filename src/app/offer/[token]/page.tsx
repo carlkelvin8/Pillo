@@ -96,7 +96,10 @@ export default async function OfferPage({
       />
     );
   }
-  if (r === "declined")
+  const view: OfferView = await viewOffer(createServiceClient(), token);
+
+  // The ?r= hint only shows its message when it matches the token's real state (never for an invalid token).
+  if (r === "declined" && view.state === "closed" && view.status === "declined")
     return (
       <Shell
         mood="happy"
@@ -104,7 +107,9 @@ export default async function OfferPage({
         body="We'll keep you on the waitlist for the next opening."
       />
     );
-  if (r === "taken")
+  // "taken" only for the taken path (the accept flow marked this offer 'expired' because the slot was
+  // filled), never for an offer that merely timed out (still 'sent', past its expiry).
+  if (r === "taken" && view.state === "closed" && view.status === "expired")
     return (
       <Shell
         mood="sleepy"
@@ -113,18 +118,14 @@ export default async function OfferPage({
       />
     );
 
-  const view: OfferView = await viewOffer(createServiceClient(), token);
-
-  if (view.state === "accepted" || r === "accepted")
+  if (view.state === "accepted")
     return (
       <Shell
         mood="happy"
         title="Booked na po!"
         body="Your appointment is confirmed. See you at the clinic. If you can't make it, please tell the clinic early."
       >
-        {view.state === "accepted" ? (
-          <ClinicLocation branch={view.branch} websiteUrl={view.websiteUrl} />
-        ) : null}
+        <ClinicLocation branch={view.branch} websiteUrl={view.websiteUrl} />
       </Shell>
     );
   if (view.state === "invalid" || view.state === "closed")

@@ -48,6 +48,33 @@ describe("DrPillCompanion", () => {
     expect(screen.queryByRole("region", { name: "Dr. Pill help" })).toBeNull();
   });
 
+  it("closes the help panel with Escape", () => {
+    render(<DrPillCompanion role="doctor" />);
+    fireEvent.click(screen.getByRole("button", { name: "Open Dr. Pill help" }));
+    expect(screen.getByRole("region", { name: "Dr. Pill help" })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("region", { name: "Dr. Pill help" })).not.toBeInTheDocument();
+  });
+
+  it("returns focus to the toggle when Escape closes the panel", () => {
+    render(<DrPillCompanion role="doctor" />);
+    fireEvent.click(screen.getByRole("button", { name: "Open Dr. Pill help" }));
+    const link = screen.getByRole("link", { name: "Appointments" });
+    link.focus();
+    fireEvent.keyDown(link, { key: "Escape" });
+    expect(screen.queryByRole("region", { name: "Dr. Pill help" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Dr. Pill help" })).toHaveFocus();
+  });
+
+  it("ignores an Escape that something else already handled", () => {
+    render(<DrPillCompanion role="doctor" />);
+    fireEvent.click(screen.getByRole("button", { name: "Open Dr. Pill help" }));
+    const link = screen.getByRole("link", { name: "Appointments" });
+    link.addEventListener("keydown", (event) => event.preventDefault());
+    fireEvent.keyDown(link, { key: "Escape" });
+    expect(screen.getByRole("region", { name: "Dr. Pill help" })).toBeInTheDocument();
+  });
+
   it("changes expression on hover and keeps animation controls automatic", () => {
     render(<DrPillCompanion role="owner" />);
 

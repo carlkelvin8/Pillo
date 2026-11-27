@@ -1,5 +1,6 @@
 export const DEMO_VOICE_LINES = {
-  intro: "Hi! I’m your local demo companion. Choose a clinic workflow to explore. This demo uses fictional examples only.",
+  intro:
+    "Hi! I’m your local demo companion. Choose a clinic workflow to explore. This demo uses fictional examples only.",
   schedule:
     "I can help prepare an appointment request. Choose a visit type and preferred time, then staff can confirm an available slot. No booking was made in this demo.",
   recall:

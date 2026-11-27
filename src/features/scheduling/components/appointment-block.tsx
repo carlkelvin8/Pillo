@@ -29,6 +29,8 @@ export type BlockData = {
   doctorName: string;
   branchId: string;
   branchName: string;
+  /** Clinic-local "YYYY-MM-DD" of the appointment. */
+  date: string;
   dateLabel: string;
   timeLabel: string;
   durationMin: number;
@@ -158,6 +160,7 @@ function Details({ block, onDone }: { block: BlockData; onDone: () => void }) {
                 openDates={block.openDates}
                 tz={block.tz}
                 excludeAppointmentId={block.id}
+                initialDate={block.date}
                 error={moveState.fieldErrors?.startsAt?.[0]}
               />
               <div className="flex gap-3">

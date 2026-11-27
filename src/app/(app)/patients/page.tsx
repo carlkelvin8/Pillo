@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ChevronRight, Search } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -44,7 +45,8 @@ export default async function PatientsPage({ searchParams }: Props) {
   const tz = membership.clinic.timezone;
   const clinicId = membership.clinic.id;
   const filter: PatientListFilter = params.filter === "new" ? "new" : "all";
-  const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
+  // Capped so a huge ?page= cannot produce an absurd range; the last-page redirect below still applies.
+  const page = Math.min(100_000, Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1));
   const q = (params.q ?? "").slice(0, 60);
 
   const today = todayIn(tz);
@@ -53,13 +55,22 @@ export default async function PatientsPage({ searchParams }: Props) {
     listPatients({ clinicId, q, filter, page, monthStartIso }),
     patientStats(clinicId, monthStartIso),
   ]);
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (page > pages) {
+    // A stale or hand-typed page number: go to the last page instead of showing an empty or broken list.
+    const back = new URLSearchParams();
+    if (q) back.set("q", q);
+    if (filter === "new") back.set("filter", "new");
+    if (pages > 1) back.set("page", String(pages));
+    const s = back.toString();
+    redirect(s ? `/patients?${s}` : "/patients");
+  }
   const nowIso = new Date().toISOString();
   const summaries = await visitSummaries(
     clinicId,
     rows.map((r) => r.id),
     nowIso,
   );
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const href = (over: Record<string, string | undefined>) => {
     const next = new URLSearchParams();
     const merged = {

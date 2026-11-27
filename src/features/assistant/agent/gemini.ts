@@ -41,10 +41,12 @@ function toInteractionInput(messages: ModelMessage[]): InteractionInputStep[] {
       return steps;
     }
 
-    return [{
-      type: message.role === "assistant" ? "model_output" : "user_input",
-      content: [{ type: "text", text: message.content }],
-    }];
+    return [
+      {
+        type: message.role === "assistant" ? "model_output" : "user_input",
+        content: [{ type: "text", text: message.content }],
+      },
+    ];
   });
 }
 
@@ -74,16 +76,18 @@ export function createGeminiModelCall(options: {
     const text = steps
       .filter((step) => step.type === "model_output")
       .flatMap((step) => step.content ?? [])
-      .flatMap((part) => part.type === "text" ? [part.text] : [])
+      .flatMap((part) => (part.type === "text" ? [part.text] : []))
       .join("\n")
       .trim();
     const toolCalls = steps.flatMap((step, index) => {
       if (step.type !== "function_call") return [];
-      return [{
-        id: step.id || `missing-${index}`,
-        name: step.name ?? "",
-        input: asArguments(step.arguments),
-      }];
+      return [
+        {
+          id: step.id || `missing-${index}`,
+          name: step.name ?? "",
+          input: asArguments(step.arguments),
+        },
+      ];
     });
 
     return {

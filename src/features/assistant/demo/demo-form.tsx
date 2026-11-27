@@ -21,7 +21,7 @@ export function SyntheticDemoForm({ available }: { available: boolean }) {
           {SYNTHETIC_QUESTIONS.map((question) => (
             <label
               key={question}
-              className="rounded-control border-line bg-surface flex min-h-12 items-center gap-3 border px-4 py-3 has-[:checked]:border-ink has-[:checked]:bg-subtle"
+              className="rounded-control border-line bg-surface has-[:checked]:border-ink has-[:checked]:bg-subtle flex min-h-12 items-center gap-3 border px-4 py-3"
             >
               <input
                 type="radio"
@@ -47,7 +47,9 @@ export function SyntheticDemoForm({ available }: { available: boolean }) {
           <div className="min-w-0">
             <p className="mb-2 text-sm font-semibold">Demo Family Dental</p>
             <p className="whitespace-pre-wrap">{state.data.reply}</p>
-            <p className="text-muted mt-3 text-xs">Synthetic demo · {state.data.steps} model steps</p>
+            <p className="text-muted mt-3 text-xs">
+              Synthetic demo · {state.data.steps} model steps
+            </p>
           </div>
         </div>
       ) : null}

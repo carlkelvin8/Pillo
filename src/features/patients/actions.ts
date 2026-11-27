@@ -13,10 +13,13 @@ import {
 import { sanitizeSearch } from "@/features/patients/age";
 import { echo, formString, validationFailed, type ActionState } from "@/lib/action-state";
 import { createClient } from "@/lib/supabase/server";
-import { parsePatientCsv } from "@/features/patients/import-csv";
+import { parsePatientCsv, patientDedupKey } from "@/features/patients/import-csv";
 
 const DENIED: ActionState = { message: "You do not have permission to do that." };
 const PATIENT_KEYS = ["fullName", "birthdate", "sex", "phone", "email"] as const;
+const DEDUP_PAGE_SIZE = 1000;
+const DEDUP_MAX_PAGES = 50;
+const DEDUP_FAILED = "We could not check for duplicates. Nothing was imported.";
 
 export async function importPatientsCsvAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const ws = await getWorkspace();
@@ -27,11 +30,36 @@ export async function importPatientsCsvAction(_prev: ActionState, formData: Form
   catch (error) { return { message: error instanceof Error ? error.message : "Invalid CSV." }; }
   if (!parsed.rows.length) return { message: `No valid rows to import (${parsed.errors.length} have errors).` };
   const supabase = await createClient();
-  const { data, error } = await supabase.from("patients").insert(parsed.rows.map((row) => ({ clinic_id: ws.membership!.clinic.id, ...row }))).select("id");
+  const clinicId = ws.membership.clinic.id;
+  // Skip repeats: the same name and phone twice in the file, or a patient the clinic already has.
+  // Read the clinic's whole directory in pages (names are matched case-insensitively, so `.in()` cannot do it).
+  const seen = new Set<string>();
+  for (let page = 0; ; page++) {
+    if (page >= DEDUP_MAX_PAGES) return { message: DEDUP_FAILED };
+    const from = page * DEDUP_PAGE_SIZE;
+    const { data: existing, error: existingError } = await supabase
+      .from("patients")
+      .select("full_name, phone")
+      .eq("clinic_id", clinicId)
+      .order("id")
+      .range(from, from + DEDUP_PAGE_SIZE - 1);
+    if (existingError || !existing) return { message: DEDUP_FAILED };
+    for (const p of existing as { full_name: string; phone: string | null }[]) seen.add(patientDedupKey(p.full_name, p.phone));
+    if (existing.length < DEDUP_PAGE_SIZE) break;
+  }
+  const fresh = parsed.rows.filter((row) => {
+    const k = patientDedupKey(row.full_name, row.phone);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  const duplicates = parsed.rows.length - fresh.length;
+  if (!fresh.length) return { message: `Nothing to import: all ${duplicates} valid rows are already in your patient list.` };
+  const { data, error } = await supabase.from("patients").insert(fresh.map((row) => ({ clinic_id: clinicId, ...row }))).select("id");
   if (error || !data) return { message: "We could not import the patients. No rows were confirmed." };
-  await logAudit(supabase, ws.membership.clinic.id, "patient.imported", "patient_import", null, { imported: data.length, rejected: parsed.errors.length, total: parsed.total });
+  await logAudit(supabase, clinicId, "patient.imported", "patient_import", null, { imported: data.length, rejected: parsed.errors.length, duplicates, total: parsed.total });
   revalidatePath("/patients");
-  return { ok: true, message: `Imported ${data.length} patients; ${parsed.errors.length} rows skipped.` };
+  return { ok: true, message: `Imported ${data.length} patients; ${parsed.errors.length} rows with errors and ${duplicates} duplicates skipped.` };
 }
 
 function patientInput(formData: FormData) {

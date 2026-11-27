@@ -6,6 +6,7 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Input, Select } from "@/components/ui/input";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { ActionState } from "@/lib/action-state";
+import { DEFAULT_TZ, todayIn } from "@/lib/datetime";
 import type { Patient } from "@/features/patients/schemas";
 
 type Props = {
@@ -44,7 +45,7 @@ export function PatientForm({ action, patient, submitLabel, onDone }: Props) {
           <Input
             name="birthdate"
             type="date"
-            max={new Date().toISOString().slice(0, 10)}
+            max={todayIn(DEFAULT_TZ)}
             defaultValue={v("birthdate", patient?.birthdate)}
           />
         </Field>

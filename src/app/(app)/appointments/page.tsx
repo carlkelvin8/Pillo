@@ -183,6 +183,7 @@ export default async function AppointmentsPage({ searchParams }: Props) {
           doctorName: doctorName.get(a.doctor_id) ?? "Doctor",
           branchId: a.branch_id,
           branchName: branchNameById.get(a.branch_id) ?? "",
+          date: d,
           dateLabel: `${formatWeekday(d)} ${formatDateLong(d)}`,
           timeLabel: `${formatTime(a.starts_at, tz)} to ${formatTime(a.ends_at, tz)}`,
           durationMin: Math.round(
@@ -386,7 +387,7 @@ export default async function AppointmentsPage({ searchParams }: Props) {
                         )}
                       </div>
                       <div className="border-line flex items-center justify-between gap-2 border-t pt-2">
-                        <OutreachChip ok={w.outreach_ok} />
+                        <OutreachChip outreach={w.outreach_ok} consented={w.consented} />
                         <WaitlistRemoveButton entryId={w.id} name={name} />
                       </div>
                     </li>
@@ -512,9 +513,12 @@ export default async function AppointmentsPage({ searchParams }: Props) {
           ) : null}
 
           {view === "month" ? (
-            <div className="grid grid-cols-7 gap-2" aria-label="Appointments by month">
+            <div
+              className="grid grid-cols-[repeat(7,minmax(0,1fr))] gap-1 sm:gap-2"
+              aria-label="Appointments by month"
+            >
               {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-                <p key={day} className="text-muted px-2 py-1 text-center text-xs font-semibold">
+                <p key={day} className="text-muted py-1 text-center text-xs font-semibold sm:px-2">
                   {day}
                 </p>
               ))}

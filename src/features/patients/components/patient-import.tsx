@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,12 @@ export function PatientImport() {
   const [csv, setCsv] = useState("");
   const [preview, setPreview] = useState<PatientCsvResult | null>(null);
   const [fileError, setFileError] = useState("");
+  // The file that was already imported: block a second click from importing the same rows again.
+  const [importedCsv, setImportedCsv] = useState<string | null>(null);
+  useEffect(() => {
+    if (state.ok) setImportedCsv(csv);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the moment the import succeeds matters
+  }, [state]);
   async function selectFile(file?: File) {
     if (!file) return;
     if (file.size > 1_048_576) { setFileError("CSV must be 1 MB or smaller."); setPreview(null); return; }
@@ -26,12 +32,12 @@ export function PatientImport() {
   return (
     <Card className="flex flex-col gap-3">
       <div><CardTitle>Import patients</CardTitle><p className="text-muted mt-1 text-sm">CSV columns: full_name, phone, email, birthdate, sex. Up to 1,000 rows and 1 MB. Imported records have no consent recorded.</p></div>
-      <input type="file" accept=".csv,text/csv" onChange={(event) => void selectFile(event.target.files?.[0])} aria-label="Choose patient CSV" />
+      <input type="file" accept=".csv,text/csv" className="min-h-11 w-full text-sm file:rounded-control file:border-line-strong file:bg-surface file:mr-3 file:min-h-11 file:cursor-pointer file:border file:px-4 file:text-sm file:font-medium" onChange={(event) => void selectFile(event.target.files?.[0])} aria-label="Choose patient CSV" />
       {fileError ? <p className="text-danger-chip-ink text-sm" role="alert">{fileError}</p> : null}
       {preview ? <div className="flex flex-col gap-2 text-sm" role="status"><p>{preview.rows.length} valid rows · {preview.errors.length} rows with errors</p>{preview.errors.slice(0, 8).map((error) => <p key={error.row} className="text-danger-chip-ink">Row {error.row}: {error.message}</p>)}{preview.errors.length > 8 ? <p className="text-muted">And {preview.errors.length - 8} more row errors.</p> : null}<p className="text-muted">Preview: {preview.rows.slice(0, 3).map((row) => row.full_name).join(", ") || "No valid patients"}</p></div> : null}
       <form action={action} className="flex flex-col gap-3">
         <input type="hidden" name="csv" value={csv} />
-        <div className="flex items-center gap-2"><SubmitButton pendingLabel="Importing…" disabled={!preview?.rows.length}>Import valid rows</SubmitButton>{state.ok ? <Button asChild variant="ghost"><Link href="/patients">Refresh patient list</Link></Button> : null}</div>
+        <div className="flex items-center gap-2"><SubmitButton pendingLabel="Importing…" disabled={!preview?.rows.length || csv === importedCsv}>Import valid rows</SubmitButton>{state.ok ? <Button asChild variant="ghost"><Link href="/patients">Refresh patient list</Link></Button> : null}</div>
         <FormMessage state={state} />
       </form>
     </Card>

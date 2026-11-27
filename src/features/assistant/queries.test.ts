@@ -39,3 +39,26 @@ describe("getRules", () => {
     });
   });
 });
+
+import { listActions } from "./queries";
+
+describe("listActions", () => {
+  it("reports the total instead of failing when the page is past the last row", async () => {
+    const results = [
+      { data: null, count: null, error: { code: "PGRST103" } },
+      { data: null, count: 7, error: null },
+    ];
+    const query = {
+      select: vi.fn(() => query),
+      eq: vi.fn(() => query),
+      neq: vi.fn(() => query),
+      order: vi.fn(() => query),
+      range: vi.fn(() => query),
+      then: (resolve: (value: unknown) => unknown) =>
+        Promise.resolve(results.shift()).then(resolve),
+    };
+    mockCreateClient.mockResolvedValue({ from: vi.fn(() => query) });
+
+    await expect(listActions("clinic-id", 999)).resolves.toEqual({ rows: [], total: 7 });
+  });
+});

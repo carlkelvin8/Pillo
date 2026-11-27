@@ -24,7 +24,9 @@ export async function authenticateMcp(header: string | null): Promise<McpAuth | 
     const row = rows[0] as { id: string; clinic_id: string; scopes: string[] } | undefined;
     if (!row) return null;
     await db.execute(sql`select set_config('app.mcp_clinic_id', ${row.clinic_id}, true)`);
-    await db.execute(sql`update public.mcp_tokens set last_used_at = now() where id = ${row.id} and clinic_id = ${row.clinic_id}`);
+    await db.execute(
+      sql`update public.mcp_tokens set last_used_at = now() where id = ${row.id} and clinic_id = ${row.clinic_id}`,
+    );
     return { tokenId: row.id, clinicId: row.clinic_id, scopes: row.scopes };
   });
 }

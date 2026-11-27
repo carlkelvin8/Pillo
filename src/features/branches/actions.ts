@@ -123,25 +123,17 @@ export async function saveHoursAction(
   }
   const supabase = await createClient();
   const { branchId } = parsed.data;
-  const { error: delError } = await supabase
-    .from("clinic_hours")
-    .delete()
-    .eq("clinic_id", ctx.clinicId)
-    .eq("branch_id", branchId);
-  if (delError) return { message: "We could not save the hours." };
+  // One transaction in the database (save_branch_hours): the old week is replaced atomically, and RLS
+  // still decides who may write hours. An empty array means closed all week.
   const rows = parsed.data.days
     .filter((d) => d.open)
-    .map((d) => ({
-      clinic_id: ctx.clinicId,
-      branch_id: branchId,
-      weekday: d.weekday,
-      opens_at: d.opens,
-      closes_at: d.closes,
-    }));
-  if (rows.length > 0) {
-    const { error } = await supabase.from("clinic_hours").insert(rows);
-    if (error) return { message: "We could not save the hours." };
-  }
+    .map((d) => ({ weekday: d.weekday, opens_at: d.opens, closes_at: d.closes }));
+  const { error } = await supabase.rpc("save_branch_hours", {
+    p_clinic_id: ctx.clinicId,
+    p_branch_id: branchId,
+    p_hours: rows,
+  });
+  if (error) return { message: "We could not save the hours." };
   await logAudit(supabase, ctx.clinicId, "hours.updated", "branch", branchId);
   revalidatePath("/settings/branches");
   revalidatePath("/appointments");

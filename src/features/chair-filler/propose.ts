@@ -30,7 +30,14 @@ const waitSchema = z.object({
  */
 export async function proposeOffers(
   supabase: SupabaseClient,
-  args: { clinicId: string; appointmentId: string; tz: string; now?: Date },
+  args: {
+    clinicId: string;
+    appointmentId: string;
+    tz: string;
+    now?: Date;
+    /** The slot that became free when the appointment moved (reschedule); defaults to its own time. */
+    freed?: { startsAt: string; endsAt: string };
+  },
 ): Promise<number> {
   try {
     const now = args.now ?? new Date();
@@ -42,7 +49,9 @@ export async function proposeOffers(
       .maybeSingle();
     const appt = apptSchema.safeParse(a);
     if (!appt.success) return 0;
-    const slot = appt.data;
+    const slot = args.freed
+      ? { ...appt.data, starts_at: args.freed.startsAt, ends_at: args.freed.endsAt }
+      : appt.data;
 
     const { data: rule } = await supabase
       .from("agent_rules")
@@ -72,21 +81,31 @@ export async function proposeOffers(
     if (rows.length === 0) return 0;
     const ids = [...new Set(rows.map((r) => r.patient_id))];
 
-    const [{ data: pts }, { data: busy }] = await Promise.all([
-      supabase
-        .from("patients")
-        .select("id, consent_at")
-        .eq("clinic_id", args.clinicId)
-        .in("id", ids),
-      supabase
-        .from("appointments")
-        .select("patient_id, starts_at, ends_at")
-        .eq("clinic_id", args.clinicId)
-        .in("patient_id", ids)
-        .in("status", ["scheduled", "confirmed", "arrived"])
-        .lt("starts_at", slot.ends_at)
-        .gt("ends_at", slot.starts_at),
-    ]);
+    const [{ data: pts, error: patientsError }, { data: busy, error: busyError }] =
+      await Promise.all([
+        supabase
+          .from("patients")
+          .select("id, consent_at")
+          .eq("clinic_id", args.clinicId)
+          .in("id", ids),
+        supabase
+          .from("appointments")
+          .select("patient_id, starts_at, ends_at")
+          .eq("clinic_id", args.clinicId)
+          .in("patient_id", ids)
+          .in("status", ["scheduled", "confirmed"])
+          .lt("starts_at", slot.ends_at)
+          .gt("ends_at", slot.starts_at),
+      ]);
+    // Fail closed: without consent and busy data we cannot tell who may be offered the slot.
+    if (patientsError) {
+      console.error(`chair-filler: could not load patients (${patientsError.code})`);
+      return 0;
+    }
+    if (busyError) {
+      console.error(`chair-filler: could not load busy patients (${busyError.code})`);
+      return 0;
+    }
     const consented = new Set((pts ?? []).filter((p) => p.consent_at).map((p) => p.id as string));
     const busyBy = new Map<string, { startsAt: string; endsAt: string }[]>();
     for (const b of busy ?? []) {

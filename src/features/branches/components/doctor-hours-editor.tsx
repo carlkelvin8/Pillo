@@ -43,7 +43,7 @@ export function DoctorHoursEditor({ doctorId, branches, windows }: { doctorId: s
   const [removeState, removeAction] = useActionState<ActionState, FormData>(removeDoctorHoursAction, {});
   return (
     <details className="w-full rounded-card border border-line p-4">
-      <summary className="cursor-pointer font-medium">Weekly hours by branch</summary>
+      <summary className="flex min-h-11 cursor-pointer items-center font-medium">Weekly hours by branch</summary>
       <p className="text-muted mt-2 text-sm">With no saved windows, this doctor is available whenever the branch is open.</p>
       <div className="mt-4 flex flex-col gap-3">
         {windows.map((window) => (

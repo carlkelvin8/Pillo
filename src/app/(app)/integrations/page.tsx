@@ -5,7 +5,7 @@ import { projectMcpActivity } from "@/features/mcp/activity";
 import { IntegrationsOverview } from "@/features/mcp/components/integrations-overview";
 import { TokenManager } from "@/features/mcp/components/token-manager";
 import { APP_NAME } from "@/config/brand";
-import { serverEnv } from "@/lib/env-server";
+import { mcpDatabaseConfigured } from "@/features/mcp/database";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Integrations" };
@@ -33,7 +33,7 @@ export default async function Page() {
   const endpoint = new URL("/api/mcp", baseUrl).toString();
   return <>
     <PageHeader eyebrow={`${APP_NAME} · MCP`} title="Integrations" />
-    <IntegrationsOverview endpoint={endpoint} databaseConfigured={Boolean(serverEnv().DATABASE_URL)} activity={activity} activityUnavailable={Boolean(activityResult.error)} timezone={membership.clinic.timezone} />
+    <IntegrationsOverview endpoint={endpoint} databaseConfigured={mcpDatabaseConfigured()} activity={activity} activityUnavailable={Boolean(activityResult.error)} timezone={membership.clinic.timezone} />
     <TokenManager tokens={tokens} timezone={membership.clinic.timezone} />
   </>;
 }

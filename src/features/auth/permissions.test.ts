@@ -21,6 +21,9 @@ describe("permissions matrix", () => {
     for (const cap of MATRIX_CAPABILITIES) expect(can("owner", cap)).toBe(true);
   });
 
+  it("owner and receptionist use the Dr. Pill inbox; doctor and billing do not", () => {
+    expect(ROLES.filter((r) => can(r, "inbox.view"))).toEqual(["owner", "receptionist"]);
+  });
   it("only owners manage staff and integrations", () => {
     expect(ROLES.filter((r) => can(r, "staff.manage"))).toEqual(["owner"]);
     expect(ROLES.filter((r) => can(r, "integrations.manage"))).toEqual(["owner"]);

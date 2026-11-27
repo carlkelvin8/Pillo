@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/features/clinic/actions", () => ({
@@ -6,6 +6,7 @@ vi.mock("@/features/clinic/actions", () => ({
   removeClinicLogoAction: vi.fn(async () => ({})),
 }));
 
+import { uploadClinicLogoAction } from "@/features/clinic/actions";
 import { ClinicLogoForm } from "./clinic-logo-form";
 
 const png = (name: string) => new File([new Uint8Array([1, 2, 3])], name, { type: "image/png" });
@@ -35,5 +36,19 @@ describe("ClinicLogoForm preview URLs", () => {
 
     unmount();
     expect(revoke).toHaveBeenCalledWith("blob:preview-2");
+  });
+
+  it("drops the preview after a rejected upload so Upload cannot be sent with no file", async () => {
+    vi.mocked(uploadClinicLogoAction).mockResolvedValueOnce({ message: "Use a PNG, JPG or WebP image." });
+    const { container } = render(<ClinicLogoForm clinicName="Clinic" logoUrl={null} />);
+    const input = container.querySelector<HTMLInputElement>("input[type=file]")!;
+    fireEvent.change(input, { target: { files: [png("a.png")] } });
+    const upload = screen.getByRole("button", { name: /upload logo/i });
+    expect(upload).toBeEnabled();
+    await act(async () => {
+      fireEvent.submit(container.querySelector("form")!);
+    });
+    expect(await screen.findByText("Use a PNG, JPG or WebP image.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /upload logo/i })).toBeDisabled();
   });
 });

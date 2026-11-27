@@ -270,6 +270,98 @@ describe("role matrix", () => {
   });
 });
 
+describe("waitlist uniqueness", () => {
+  it("allows only one active entry per patient, but a removed one does not block", async () => {
+    const [p] = await admin<{ id: string }[]>`
+      insert into public.patients (clinic_id, full_name) values (${clinicA}, 'Waitlist Twice') returning id`;
+    const pid = p?.id ?? "";
+    await asUserCommitted(u.recepA, async (tx) => {
+      await tx`insert into public.waitlist_entries (clinic_id, patient_id) values (${clinicA}, ${pid})`;
+    });
+    const err = await failure(
+      u.recepA,
+      (tx) => tx`insert into public.waitlist_entries (clinic_id, patient_id) values (${clinicA}, ${pid})`,
+    );
+    expect(err.code).toBe("23505");
+
+    await admin`update public.waitlist_entries set status = 'removed' where clinic_id = ${clinicA} and patient_id = ${pid}`;
+    await asUser(u.recepA, async (tx) => {
+      const rows =
+        await tx`insert into public.waitlist_entries (clinic_id, patient_id) values (${clinicA}, ${pid}) returning id`;
+      expect(rows).toHaveLength(1);
+    });
+  });
+});
+
+describe("save_branch_hours", () => {
+  type Hour = { weekday: number; opens_at: string; closes_at: string };
+  const hoursOf = async (branch: string) =>
+    admin<Hour[]>`
+      select weekday, to_char(opens_at, 'HH24:MI') as opens_at, to_char(closes_at, 'HH24:MI') as closes_at
+      from public.clinic_hours where clinic_id = ${clinicA} and branch_id = ${branch} order by weekday`;
+  let branch = "";
+
+  beforeAll(async () => {
+    const [b] = await admin<{ id: string }[]>`
+      insert into public.branches (clinic_id, name) values (${clinicA}, 'Hours branch') returning id`;
+    branch = b?.id ?? "";
+    await admin`insert into public.clinic_hours (clinic_id, branch_id, weekday, opens_at, closes_at)
+                values (${clinicA}, ${branch}, 1, '09:00', '17:00'), (${clinicA}, ${branch}, 2, '09:00', '17:00')`;
+  });
+
+  it("saving a week with every day closed is remembered as saved", async () => {
+    const [b] = await admin<{ id: string }[]>`
+      insert into public.branches (clinic_id, name) values (${clinicA}, 'Closed branch') returning id`;
+    await asUserCommitted(u.ownerA, async (tx) => {
+      await tx`select public.save_branch_hours(${clinicA}, ${b!.id}, ${tx.json([])})`;
+    });
+    const [row] = await admin<{ saved: boolean; hours: number }[]>`
+      select hours_saved_at is not null as saved,
+             (select count(*)::int from public.clinic_hours where branch_id = ${b!.id}) as hours
+      from public.branches where id = ${b!.id}`;
+    expect(row).toEqual({ saved: true, hours: 0 });
+  });
+
+  it("an owner replaces the week in one call", async () => {
+    const week = [
+      { weekday: 3, opens_at: "08:00", closes_at: "12:00" },
+      { weekday: 4, opens_at: "13:00", closes_at: "18:00" },
+    ];
+    await asUserCommitted(u.ownerA, async (tx) => {
+      await tx`select public.save_branch_hours(${clinicA}, ${branch}, ${tx.json(week)})`;
+    });
+    expect(await hoursOf(branch)).toEqual(week);
+  });
+
+  it("receptionists and doctors cannot save hours, and the week stays unchanged", async () => {
+    const before = await hoursOf(branch);
+    for (const who of [u.recepA, u.doctorA]) {
+      const err = await failure(
+        who,
+        (tx) =>
+          tx`select public.save_branch_hours(${clinicA}, ${branch}, ${tx.json([{ weekday: 5, opens_at: "09:00", closes_at: "10:00" }])})`,
+      );
+      expect(err.code).toBe("42501");
+    }
+    expect(await hoursOf(branch)).toEqual(before);
+  });
+
+  it("an invalid row (closes before opens) fails and keeps the previous hours", async () => {
+    const before = await hoursOf(branch);
+    expect(before.length).toBeGreaterThan(0);
+    const err = await failure(
+      u.ownerA,
+      (tx) =>
+        tx`select public.save_branch_hours(${clinicA}, ${branch}, ${tx.json([
+          { weekday: 1, opens_at: "09:00", closes_at: "10:00" },
+          { weekday: 2, opens_at: "17:00", closes_at: "09:00" },
+        ])})`,
+    );
+    expect(err.code).toBe("23514");
+    expect(await hoursOf(branch)).toEqual(before);
+  });
+});
+
 describe("appointments", () => {
   it("clients cannot create AI/portal appointments or pre-completed ones", async () => {
     const ai = await failure(

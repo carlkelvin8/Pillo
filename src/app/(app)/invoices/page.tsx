@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { FilePlus } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -58,7 +59,8 @@ export default async function InvoicesPage({ searchParams }: Props) {
   const clinicId = membership.clinic.id;
   const tz = membership.clinic.timezone;
   const filter = FILTERS.find((f) => f.key === params.filter)?.key ?? "all";
-  const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
+  // Capped so a huge ?page= cannot produce an absurd range; the last-page redirect below still applies.
+  const page = Math.min(100_000, Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1));
   const today = todayIn(tz);
   const monthStartIso = zonedToUtcIso(`${today.slice(0, 8)}01`, "00:00", tz);
 
@@ -73,6 +75,8 @@ export default async function InvoicesPage({ searchParams }: Props) {
   const pages = Math.max(1, Math.ceil(total / INVOICE_PAGE_SIZE));
   const href = (f: InvoiceFilter, p = 1) =>
     `/invoices${f === "all" && p === 1 ? "" : `?${new URLSearchParams({ ...(f === "all" ? {} : { filter: f }), ...(p > 1 ? { page: String(p) } : {}) })}`}`;
+
+  if (page > pages) redirect(href(filter, pages));
 
   return (
     <>

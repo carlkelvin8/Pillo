@@ -1,8 +1,9 @@
 import { dateOf, minutesOfDay, toMinutes } from "@/lib/datetime";
 
-const BOOKED_HOUR_PX = 64;
+// 96px per booked hour makes a 30-minute block 44px tall: the minimum touch target.
+const BOOKED_HOUR_PX = 96;
 const EMPTY_HOUR_PX = 40;
-const BLOCK_MIN_PX = 24;
+const BLOCK_MIN_PX = 44;
 const BLOCK_INSET_PX = 2;
 export const HEADER_PX = 44;
 

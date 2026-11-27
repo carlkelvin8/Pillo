@@ -8,23 +8,29 @@ import {
   getClinicBySlug,
   isClinicOpenNow,
 } from "@/features/assistant/chat-service";
+import { serverEnv } from "@/lib/env-server";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export const metadata: Metadata = { title: "Chat" };
 export const dynamic = "force-dynamic";
 
+function Unavailable() {
+  return (
+    <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
+      <DrPillAvatar mood="sleepy" size={96} decorative />
+      <h1 className="text-card-title">{ASSISTANT_NAME} is not available yet</h1>
+      <p className="text-muted">Please contact the clinic directly.</p>
+    </main>
+  );
+}
+
 /** Public page: no login. Shows only the clinic's name. */
 export default async function PublicChatPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  if (!chatConfigured().ok) {
-    return (
-      <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
-        <DrPillAvatar mood="sleepy" size={96} decorative />
-        <h1 className="text-card-title">{ASSISTANT_NAME} is not available yet</h1>
-        <p className="text-muted">Please contact the clinic directly.</p>
-      </main>
-    );
-  }
+  // While chat is disabled (live AI is off by default, or the service key is missing) every slug gets
+  // the same page and no clinic is looked up, so slugs cannot be enumerated. Only an enabled chat
+  // looks up the clinic and returns 404 for an unknown slug.
+  if (!serverEnv().SUPABASE_SERVICE_ROLE_KEY || !chatConfigured().ok) return <Unavailable />;
   const svc = createServiceClient();
   const clinic = await getClinicBySlug(svc, slug);
   if (!clinic) notFound();

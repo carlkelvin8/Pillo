@@ -8,14 +8,14 @@ describe("blockPosition", () => {
   it("aligns a booked block after a compact empty row", () => {
     const appointment = { startsAt: at(9), endsAt: at(10) };
     const grid = calendarGrid([{ start: "08:00", end: "10:00" }], [appointment], TZ);
-    expect(blockPosition(appointment, TZ, grid)).toEqual({ top: 42, height: 60 });
+    expect(blockPosition(appointment, TZ, grid)).toEqual({ top: 42, height: 92 });
   });
 
   it("preserves the height of short appointments and keeps them inside the grid", () => {
     const appointment = { startsAt: at(9, 45), endsAt: at(10) };
     const grid = calendarGrid([], [appointment], TZ);
-    expect(blockPosition(appointment, TZ, grid)).toEqual({ top: 50, height: 24 });
-    expect(grid.height).toBe(76);
+    expect(blockPosition(appointment, TZ, grid)).toEqual({ top: 74, height: 44 });
+    expect(grid.height).toBe(120);
   });
 });
 
@@ -37,13 +37,13 @@ describe("calendarGrid", () => {
     const grid = calendarGrid([{ start: "13:00", end: "18:00" }], [appointment], TZ);
     expect(grid.rows.map((row) => [row.hour, row.height])).toEqual([
       [13, 40],
-      [14, 64],
-      [15, 64],
+      [14, 96],
+      [15, 96],
       [16, 40],
       [17, 40],
     ]);
-    expect(grid.height).toBe(248);
-    expect(blockPosition(appointment, TZ, grid)).toEqual({ top: 90, height: 44 });
+    expect(grid.height).toBe(312);
+    expect(blockPosition(appointment, TZ, grid)).toEqual({ top: 114, height: 68 });
   });
 
   it("uses a compact daytime fallback when no hours or appointments are visible", () => {
@@ -55,8 +55,8 @@ describe("calendarGrid", () => {
   it("keeps an appointment ending at midnight in its starting-day column", () => {
     const appointment = { startsAt: at(23), endsAt: at(24) };
     const grid = calendarGrid([], [appointment], TZ);
-    expect(grid.rows).toEqual([{ hour: 23, top: 0, height: 64 }]);
-    expect(blockPosition(appointment, TZ, grid)).toEqual({ top: 2, height: 60 });
+    expect(grid.rows).toEqual([{ hour: 23, top: 0, height: 96 }]);
+    expect(blockPosition(appointment, TZ, grid)).toEqual({ top: 2, height: 92 });
   });
 });
 

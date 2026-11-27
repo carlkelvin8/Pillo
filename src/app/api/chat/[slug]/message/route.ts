@@ -24,15 +24,21 @@ const bodySchema = z.object({
   token: z.string().min(20).max(100).optional(),
 });
 
-const json = (body: Record<string, unknown>, status = 200) =>
-  NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
+const json = (body: Record<string, unknown>, status = 200, retryAfterSeconds?: number) =>
+  NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+      ...(retryAfterSeconds ? { "Retry-After": String(retryAfterSeconds) } : {}),
+    },
+  });
 
 /** Public endpoint used by the clinic's chat page. Patients are anonymous: a per-conversation token proves ownership. */
 export async function POST(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!rateLimit(`chat:${ip}`, 20, 60_000))
-    return json({ error: "Too many messages. Please wait a moment." }, 429);
+    return json({ error: "Too many messages. Please wait a moment." }, 429, 60);
 
   const config = chatConfigured();
   if (!config.ok) return json({ error: "Chat is not available yet." }, 503);
@@ -70,7 +76,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       return json({ error: "This chat is full. Please call the clinic or start a new chat." }, 429);
   } else {
     if (!rateLimit(`chat-new:${ip}`, 5, 600_000))
-      return json({ error: "Too many new chats. Please try again later." }, 429);
+      return json({ error: "Too many new chats. Please try again later." }, 429, 600);
     const created = await createConversation(svc, clinic.id);
     conversation = { id: created.id, status: "open", handledBy: "ai" };
     token = created.token;

@@ -19,7 +19,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   const headers = { "Cache-Control": "no-store" };
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!rateLimit(`chat-poll:${ip}`, 60, 60_000))
-    return NextResponse.json({ error: "Slow down." }, { status: 429, headers });
+    return NextResponse.json(
+      { error: "Slow down." },
+      { status: 429, headers: { ...headers, "Retry-After": "60" } },
+    );
   if (!serverEnv().SUPABASE_SERVICE_ROLE_KEY)
     return NextResponse.json({ error: "Chat is not available yet." }, { status: 503, headers });
 

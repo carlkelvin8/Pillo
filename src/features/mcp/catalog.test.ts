@@ -14,9 +14,17 @@ describe("MCP tool catalog", () => {
       "create_invoice",
       "request_payment",
     ]);
-    expect(MCP_TOOL_CATALOG.find((tool) => tool.name === "get_patient_summary")?.scope).toBe("patients:read");
-    expect(MCP_TOOL_CATALOG.find((tool) => tool.name === "request_payment")?.access).toBe("Approval required");
-    expect(MCP_TOOL_CATALOG.find((tool) => tool.name === "create_invoice")?.description).toMatch(/draft/i);
-    expect(MCP_TOOL_CATALOG.find((tool) => tool.name === "get_patient_summary")?.description).not.toMatch(/vitals|prescriptions/i);
+    expect(MCP_TOOL_CATALOG.find((tool) => tool.name === "get_patient_summary")?.scope).toBe(
+      "patients:read",
+    );
+    expect(MCP_TOOL_CATALOG.find((tool) => tool.name === "request_payment")?.access).toBe(
+      "Approval required",
+    );
+    expect(MCP_TOOL_CATALOG.find((tool) => tool.name === "create_invoice")?.description).toMatch(
+      /draft/i,
+    );
+    expect(
+      MCP_TOOL_CATALOG.find((tool) => tool.name === "get_patient_summary")?.description,
+    ).not.toMatch(/vitals|prescriptions/i);
   });
 });
