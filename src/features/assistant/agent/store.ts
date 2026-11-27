@@ -18,7 +18,9 @@ export type BranchInfo = {
 };
 export type DoctorInfo = { id: string; name: string; specialty: string | null };
 export type Rule = { autonomy: "suggest" | "approve" | "auto"; dailyLimit: number };
-export type HandoffReason = "medical" | "refund" | "upset" | "requested" | "booking" | "other";
+export type HandoffReason =
+  | "emergency"
+  | "medical" | "refund" | "upset" | "requested" | "booking" | "other";
 export type ActionKind = "book_appointment" | "reschedule_appointment" | "handoff" | "reply";
 
 export type ConversationAppointment = {

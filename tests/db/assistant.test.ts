@@ -168,6 +168,16 @@ describe("conversations and messages", () => {
     });
   });
 
+  it("server code can mark an emergency handoff; unknown reasons are rejected", async () => {
+    const rows =
+      await admin`update public.conversations set handoff_reason = 'emergency' where id = ${convA} returning handoff_reason`;
+    expect(rows[0]?.handoff_reason).toBe("emergency");
+    await expect(
+      admin`update public.conversations set handoff_reason = 'panic' where id = ${convA}`,
+    ).rejects.toMatchObject({ code: "23514" });
+    await admin`update public.conversations set handoff_reason = null where id = ${convA}`;
+  });
+
   it("rejects empty messages", async () => {
     const err = await failure(
       u.ownerA,

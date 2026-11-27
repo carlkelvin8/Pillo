@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 
 export const REASON_LABEL = {
+  emergency: "Possible emergency",
   medical: "Medical question",
   refund: "Refund or billing",
   upset: "Upset patient",
@@ -15,7 +16,7 @@ const conversationRow = z.object({
   status: z.enum(["open", "needs_human", "resolved"]),
   handled_by: z.enum(["ai", "human"]),
   handoff_reason: z
-    .enum(["medical", "refund", "upset", "requested", "booking", "other"])
+    .enum(["emergency", "medical", "refund", "upset", "requested", "booking", "other"])
     .nullable(),
   handoff_summary: z.string().nullable(),
   patient_id: z.string().nullable(),

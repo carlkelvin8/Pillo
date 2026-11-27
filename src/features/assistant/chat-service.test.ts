@@ -129,7 +129,7 @@ describe("handleTurn safeguards", () => {
     expect(r.reply).toBe(EMERGENCY_REPLY);
     expect(r.reply).toMatch(/911/);
     expect(calls).toHaveLength(0);
-    expect(store.handoffs[0]?.reason).toBe("medical");
+    expect(store.handoffs[0]?.reason).toBe("emergency");
     expect(saved.map((m) => m.role)).toEqual(["patient", "assistant"]);
   });
 
