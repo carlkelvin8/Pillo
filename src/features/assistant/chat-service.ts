@@ -226,14 +226,14 @@ export async function handleTurn(args: {
 
   if (detectEmergency(text)) {
     await store.handoff(
-      "medical",
+      "emergency",
       "The patient's message may describe an emergency. Please check right away.",
     );
     await store.record({
       kind: "handoff",
       status: "executed",
       autonomy: "auto",
-      payload: { reason: "medical", emergency: true },
+      payload: { reason: "emergency", emergency: true },
       outcome: "emergency guidance sent",
     });
     await deps.addMessage("assistant", "ai", EMERGENCY_REPLY);

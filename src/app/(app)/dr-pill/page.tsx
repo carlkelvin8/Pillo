@@ -156,7 +156,9 @@ export default async function InboxPage({ searchParams }: Props) {
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     {statusChip(selected)}
                     {selected.handoff_reason ? (
-                      <Chip tone="neutral">{REASON_LABEL[selected.handoff_reason]}</Chip>
+                      <Chip tone={selected.handoff_reason === "emergency" ? "danger" : "neutral"}>
+                        {REASON_LABEL[selected.handoff_reason]}
+                      </Chip>
                     ) : null}
                   </div>
                 </div>

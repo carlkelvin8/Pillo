@@ -46,6 +46,19 @@ export function mergeRefreshedFirstPage<T extends { id: string }>(
   return [...firstPage, ...kept];
 }
 
+const STATUS = {
+  needs: { label: "Needs a human", tone: "danger" },
+  resolved: { label: "Resolved", tone: "neutral" },
+  staff: { label: "With staff", tone: "pending" },
+  ai: { label: "Dr. Pill", tone: "success" },
+} as const;
+
+function statusOf(item: Pick<Item, "status" | "handledBy">) {
+  if (item.status === "needs_human") return STATUS.needs;
+  if (item.status === "resolved") return STATUS.resolved;
+  return item.handledBy === "human" ? STATUS.staff : STATUS.ai;
+}
+
 export function ConversationList({
   initialItems,
   initialTotal,
@@ -134,6 +147,7 @@ export function ConversationList({
             <Link
               href={link(item.id)}
               aria-current={item.id === selectedId ? "true" : undefined}
+              aria-label={`${item.label}, ${statusOf(item).label}, ${item.time}`}
               className={cn(
                 "rounded-control hover:bg-canvas flex min-h-11 flex-col gap-1 px-3 py-3",
                 item.id === selectedId && "bg-canvas",
@@ -145,15 +159,7 @@ export function ConversationList({
               </span>
               <span className="text-muted truncate text-sm">{item.preview}</span>
               <span>
-                {item.status === "needs_human" ? (
-                  <Chip tone="danger">Needs a human</Chip>
-                ) : item.status === "resolved" ? (
-                  <Chip tone="neutral">Resolved</Chip>
-                ) : item.handledBy === "human" ? (
-                  <Chip tone="pending">With staff</Chip>
-                ) : (
-                  <Chip tone="success">Dr. Pill</Chip>
-                )}
+                <Chip tone={statusOf(item).tone}>{statusOf(item).label}</Chip>
               </span>
             </Link>
           </li>
